@@ -687,12 +687,60 @@ export default function ProfileIntake({ onComplete }: { onComplete: (p: UserProf
 
         {/* Continue / Skip — counter-filter keeps gold vivid across all step atmospheres */}
         <div style={{ filter: "saturate(2) brightness(1.12)", display: "flex", flexDirection: "column", alignItems: "center", visibility: IS_PORTRAIT && !portraitReady ? "hidden" : "visible" }}>
+
+          {/* Rose window medallion — portrait step only */}
+          {IS_PORTRAIT && (
+            <div style={{ marginTop: "2rem", marginBottom: "0.75rem", opacity: 0.7 }}>
+              <svg width="52" height="52" viewBox="0 0 40 40" fill="none"
+                stroke="rgba(201,168,76,0.9)" strokeWidth="0.42" strokeLinecap="round">
+                <circle cx="20" cy="20" r="18.5" />
+                {(() => {
+                  const n = 16, Ro = 17, Ri = 14.8;
+                  const pts: string[] = [];
+                  for (let i = 0; i <= n; i++) {
+                    const ap = 2 * Math.PI * i / n;
+                    const am = 2 * Math.PI * (i + 0.5) / n;
+                    const xp = 20 + Ro * Math.cos(ap), yp = 20 + Ro * Math.sin(ap);
+                    const xm = 20 + Ri * Math.cos(am), ym = 20 + Ri * Math.sin(am);
+                    if (i === 0) pts.push(`M${xp.toFixed(2)} ${yp.toFixed(2)}`);
+                    else pts.push(`L${xp.toFixed(2)} ${yp.toFixed(2)}`);
+                    if (i < n) pts.push(`L${xm.toFixed(2)} ${ym.toFixed(2)}`);
+                  }
+                  return <path d={pts.join(' ')} strokeOpacity="0.38" />;
+                })()}
+                {[0,30,60,90,120,150,180,210,240,270,300,330].map(deg => (
+                  <path key={deg}
+                    d="M -1.15 5.5 C -2.4 0.5 -0.65 -12.4 0 -13.2 C 0.65 -12.4 2.4 0.5 1.15 5.5"
+                    transform={`translate(20 20) rotate(${deg + 90})`}
+                    strokeOpacity="0.7"
+                  />
+                ))}
+                {[15,45,75,105,135,165,195,225,255,285,315,345].map(deg => (
+                  <path key={deg}
+                    d="M -0.72 8.2 C -1.5 4.2 -0.38 -6.8 0 -7.6 C 0.38 -6.8 1.5 4.2 0.72 8.2"
+                    transform={`translate(20 20) rotate(${deg + 90})`}
+                    strokeOpacity="0.28"
+                  />
+                ))}
+                <circle cx="20" cy="20" r="5.2" strokeOpacity="0.25" />
+                {[0,60,120,180,240,300].map(deg => (
+                  <path key={deg}
+                    d="M -0.52 1.35 C -1.05 0.35 -0.28 -2.4 0 -2.7 C 0.28 -2.4 1.05 0.35 0.52 1.35"
+                    transform={`translate(20 20) rotate(${deg + 90})`}
+                    strokeOpacity="0.9"
+                  />
+                ))}
+                <circle cx="20" cy="20" r="0.65" />
+              </svg>
+            </div>
+          )}
+
           <button
             onClick={advance}
             disabled={!canAdvance}
             className="group relative inline-flex items-center"
             style={{
-              marginTop: IS_PORTRAIT ? "2.5rem" : step === 0 ? "1rem" : step === 2 ? "0.75rem" : step === 4 ? "0.75rem" : "2.5rem",
+              marginTop: IS_PORTRAIT ? "0" : step === 0 ? "1rem" : step === 2 ? "0.75rem" : step === 4 ? "0.75rem" : "2.5rem",
               opacity: canAdvance ? 1 : 0.32,
               transition: IS_PORTRAIT ? "opacity 2.4s ease" : "opacity 0.5s",
             }}
