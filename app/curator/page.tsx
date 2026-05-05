@@ -4,6 +4,7 @@ import { useRef, useState, useCallback, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import ProfileIntake, { UserProfile, buildProfileDescription } from "@/components/ProfileIntake";
+import ReportOfferCard from "@/components/ReportOfferCard";
 
 type MessageImage = {
   dataUrl: string;
@@ -17,6 +18,7 @@ type DisplayMessage = {
   text: string;
   images?: MessageImage[];
   isStreaming?: boolean;
+  reportReady?: boolean; // signals that a style report offer should appear
 };
 
 type ApiContent =
@@ -232,6 +234,8 @@ export default function CuratorPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [showIntake, setShowIntake] = useState(true);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [userPortrait, setUserPortrait] = useState("");
+  const [userFigures, setUserFigures] = useState<string[]>([]);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -327,12 +331,19 @@ export default function CuratorPage() {
         });
       }
 
-      // Mark streaming as done
+      // Detect report-ready signal, strip it from display text
+      const REPORT_TOKEN = "[REPORT_READY]";
+      const hasReportSignal = streamedText.includes(REPORT_TOKEN);
+      const cleanText = streamedText.replace(REPORT_TOKEN, "").trimEnd();
+
+      // Mark streaming as done, apply cleaned text and report flag
       setMessages((prev) => {
         const updated = [...prev];
         updated[updated.length - 1] = {
           ...updated[updated.length - 1],
+          text: cleanText,
           isStreaming: false,
+          reportReady: hasReportSignal,
         };
         return updated;
       });
@@ -351,6 +362,47 @@ export default function CuratorPage() {
       textareaRef.current?.focus();
     }
   }, [input, pendingImages, messages, isLoading, userProfile]);
+
+  const handleGenerateReport = useCallback(async () => {
+    const profile = userProfile ? buildProfileDescription(userProfile) : "";
+    const apiMessages = buildApiMessages(messages.filter(m => !m.isStreaming));
+
+    // Step 1: generate the report JSON via Claude
+    const genRes = await fetch("/api/generate-report", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        messages: apiMessages,
+        profile,
+        portrait: userPortrait,
+      }),
+    });
+    if (!genRes.ok) throw new Error("Report generation failed");
+    const { reportData } = await genRes.json();
+
+    // Step 2: generate and download the PDF
+    const pdfRes = await fetch("/api/download-report", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        reportData,
+        portrait: userPortrait,
+        figures: userFigures,
+      }),
+    });
+    if (!pdfRes.ok) throw new Error("PDF download failed");
+
+    // Trigger browser download
+    const blob = await pdfRes.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "ordre-style-report.pdf";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }, [messages, userProfile, userPortrait, userFigures]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -381,8 +433,10 @@ export default function CuratorPage() {
       {/* Profile intake overlay */}
       {showIntake && (
         <ProfileIntake
-          onComplete={(p) => {
+          onComplete={(p, portrait, figures) => {
             setUserProfile(p);
+            setUserPortrait(portrait);
+            setUserFigures(figures);
             setShowIntake(false);
           }}
         />
@@ -431,6 +485,14 @@ export default function CuratorPage() {
                   <AssistantMessage message={msg} />
                 ) : (
                   <UserMessage message={msg} />
+                )}
+                {/* Report offer card — appears after the assistant message that signals readiness */}
+                {msg.role === "assistant" && msg.reportReady && (
+                  <div className="px-6 md:px-10">
+                    <div className="md:ml-20">
+                      <ReportOfferCard onGenerate={handleGenerateReport} />
+                    </div>
+                  </div>
                 )}
               </div>
             ))}

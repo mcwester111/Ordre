@@ -394,7 +394,7 @@ function StepAesthetic({ profile, toggle }: { profile: UserProfile; toggle: (v: 
 
 /* ─── Summary / portrait step ───────────────────────────────────────────────── */
 
-function StepPortrait({ profile, onReady }: { profile: UserProfile; onReady: () => void }) {
+function StepPortrait({ profile, onReady }: { profile: UserProfile; onReady: (portrait: string, figures: string[]) => void }) {
   const [portrait, setPortrait] = useState("");
   const [names, setNames]       = useState<string[]>([]);
   const [loading, setLoading]   = useState(true);
@@ -412,22 +412,20 @@ function StepPortrait({ profile, onReady }: { profile: UserProfile; onReady: () 
         const raw: string = d.summary ?? "";
         // Split at the "Those who may share" heading
         const headingMatch = raw.search(/those who may share/i);
-        if (headingMatch >= 0) {
-          setPortrait(raw.slice(0, headingMatch).trim());
-          setNames(
-            raw.slice(headingMatch)
-              .split("\n")
-              .filter(l => l.includes("✦"))
-              .map(l => l.replace("✦", "").trim())
-          );
-        } else {
-          setPortrait(raw.trim());
-        }
+        const portraitText = raw.slice(0, headingMatch >= 0 ? headingMatch : raw.length).trim();
+        const parsedNames = headingMatch >= 0
+          ? raw.slice(headingMatch).split("\n").filter(l => l.includes("✦")).map(l => l.replace("✦", "").trim())
+          : [];
+        setPortrait(portraitText);
+        setNames(parsedNames);
         setLoading(false);
         // slight delay before signalling the button is ready
-        setTimeout(() => { setRevealed(true); onReady(); }, 400);
+        setTimeout(() => {
+          setRevealed(true);
+          onReady(portraitText, parsedNames);
+        }, 400);
       })
-      .catch(() => { setLoading(false); setRevealed(true); onReady(); });
+      .catch(() => { setLoading(false); setRevealed(true); onReady("", []); });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -546,10 +544,12 @@ const STEP_ATMOSPHERES = [
 
 const STEP_LABELS = ["palette", "complexion", "world", "form", "sensibility", "portrait"];
 
-export default function ProfileIntake({ onComplete }: { onComplete: (p: UserProfile) => void }) {
+export default function ProfileIntake({ onComplete }: { onComplete: (p: UserProfile, portrait: string, figures: string[]) => void }) {
   const [step, setStep] = useState(0);
   const [visible, setVisible] = useState(true);
   const [portraitReady, setPortraitReady] = useState(false);
+  const [portraitText, setPortraitText] = useState("");
+  const [portraitFigures, setPortraitFigures] = useState<string[]>([]);
   const [profile, setProfile] = useState<UserProfile>({
     colors: [], contrast: "", world: "", silhouette: "", aesthetic: [],
   });
@@ -569,11 +569,11 @@ export default function ProfileIntake({ onComplete }: { onComplete: (p: UserProf
       setVisible(false);
       setTimeout(() => { setStep(s => s + 1); setVisible(true); }, 280);
     } else {
-      onComplete(profile);
+      onComplete(profile, portraitText, portraitFigures);
     }
   };
 
-  const skip = () => onComplete(profile);
+  const skip = () => onComplete(profile, "", []);
 
   const clearSelection = () => {
     if (step === 0) setProfile(p => ({ ...p, colors: [] }));
@@ -683,7 +683,7 @@ export default function ProfileIntake({ onComplete }: { onComplete: (p: UserProf
         {step === 2 && <StepWorld      profile={profile} setProfile={setProfile} />}
         {step === 3 && <StepSilhouette profile={profile} setProfile={setProfile} />}
         {step === 4 && <StepAesthetic  profile={profile} toggle={toggleAesthetic} />}
-        {step === 5 && <StepPortrait   profile={profile} onReady={() => setPortraitReady(true)} />}
+        {step === 5 && <StepPortrait   profile={profile} onReady={(text, figs) => { setPortraitText(text); setPortraitFigures(figs); setPortraitReady(true); }} />}
 
         {/* Continue / Skip — counter-filter keeps gold vivid across all step atmospheres */}
         <div style={{ filter: "saturate(2) brightness(1.12)", display: "flex", flexDirection: "column", alignItems: "center", visibility: IS_PORTRAIT && !portraitReady ? "hidden" : "visible" }}>
