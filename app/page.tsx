@@ -1,143 +1,186 @@
 "use client";
 
-import { useState } from "react";
-import GarmentCard from "./components/GarmentCard";
+import Link from "next/link";
+import Image from "next/image";
 
-export default function Home() {
-const [garments, setGarments] = useState<
-  { name: string; category: string; image: string | null }[]
->([]);
-
-const [prompt, setPrompt] = useState("");
-const [image, setImage] = useState<string | null>(null);
-const [hasStarted, setHasStarted] = useState(false);
-const [messages, setMessages] = useState<
-  { role: "user" | "ai"; content: string }[]
->([
-  { role: "ai", content: "What style do you want to embody?" },
-]);
-function addGarment() {
-  if (!prompt || !image) return;
-
-  setGarments([
-    ...garments,
-    {
-      name: prompt,
-      category: "",
-      image,
-    },
-  ]);
-
-  setPrompt("");
-  setImage(null);
-}
-
+export default function LandingPage() {
   return (
-    <main className="min-h-screen text-black px-6 py-16 max-w-xl mx-auto">
-     <h1 className="text-[32px] tracking-[0.3em] font-normal text-center">
-  ORDRE
-</h1>
-<p className="text-center text-[10px] tracking-[0.4em] text-black/50 mt-3">
-  FORM · STRUCTURE · PRESENCE
-</p>
+    <main className="relative min-h-screen overflow-hidden flex flex-col items-center justify-center">
 
-      {/* Input */}
-    <div className="mt-16 flex flex-col gap-6">
+      {/* Feather photo background */}
+      <Image
+        src="/feathers1.png"
+        alt=""
+        fill
+        priority
+        className="object-cover object-center"
+        style={{ zIndex: 0 }}
+      />
 
-  {/* Chat messages */}
-  <div className="mt-12 flex flex-col gap-4">
-    {messages.map((m, i) => (
-      <p
-        key={i}
-        className={`text-[14px] tracking-[0.15em] text-center ${
-          m.role === "ai" ? "text-black/90" : "text-black/60"
-        }`}
+      {/* Shimmer sweep — strictly behind content (z:1 vs content z:10) */}
+      <div
+        className="pointer-events-none absolute inset-0"
         style={{
-          opacity: 0,
-          animation: "fadeIn 1.8s ease-in-out forwards",
+          zIndex: 1,
+          overflow: "hidden",
+          /* Fade shimmer out in the centre where text lives */
+          maskImage: "radial-gradient(ellipse 55% 60% at 50% 50%, transparent 30%, black 65%)",
+          WebkitMaskImage: "radial-gradient(ellipse 55% 60% at 50% 50%, transparent 30%, black 65%)",
         }}
       >
-        {m.content}
-      </p>
-    ))}
-  </div>
+        <div style={{
+          position: "absolute",
+          top: 0,
+          bottom: 0,
+          left: 0,
+          width: "60%",
+          transform: "skewX(-12deg)",
+          background: "linear-gradient(to right, transparent 0%, rgba(255,255,255,0.18) 30%, rgba(255,255,255,0.32) 50%, rgba(255,255,255,0.18) 70%, transparent 100%)",
+          animation: "feather-shimmer 15s ease-in-out infinite",
+        }} />
+      </div>
 
-  {/* Input box */}
-  <textarea
-    className="border-b border-black/20 px-1 py-2 text-[13px] tracking-wide focus:outline-none placeholder:text-black/40 resize-none text-center"
-    placeholder="Begin..."
-    value={prompt}
-    onChange={(e) => setPrompt(e.target.value)}
-    onKeyDown={(e) => {
-      if (e.key === "Enter" && !e.shiftKey) {
-        e.preventDefault();
+      {/* Dark vignette overlay — deepens centre so text is legible */}
+      <div
+        className="pointer-events-none absolute inset-0"
+        style={{
+          zIndex: 1,
+          background:
+            "radial-gradient(ellipse 80% 70% at 50% 50%, rgba(4,3,2,0.52) 0%, rgba(4,3,2,0.75) 100%)",
+        }}
+      />
 
-        if (prompt.trim().length === 0) return;
+      {/* Edge vignette for depth */}
+      <div
+        className="pointer-events-none absolute inset-0"
+        style={{
+          zIndex: 1,
+          background:
+            "linear-gradient(to bottom, rgba(4,3,2,0.45) 0%, transparent 20%, transparent 80%, rgba(4,3,2,0.55) 100%)",
+        }}
+      />
 
-        const userMessage = {
-          role: "user" as const,
-          content: prompt,
-        };
+      {/* Eyebrow — pinned to top */}
+      <div className="absolute top-8 left-0 right-0 z-10 flex flex-col items-center animate-fade-in" style={{ animationDelay: "0.1s" }}>
+        <p className="font-sans text-[0.65rem] tracking-[0.4em] uppercase"
+          style={{ color: "rgba(201,168,76,0.7)" }}>
+          Fashion Intelligence
+        </p>
+        <p style={{
+          fontFamily: "var(--font-cormorant)",
+          fontStyle: "italic",
+          fontWeight: 500,
+          fontSize: "0.85rem",
+          letterSpacing: "0.12em",
+          color: "rgba(201,168,76,0.85)",
+          marginTop: "0.25rem",
+        }}>
+          by Madeleine Claire
+        </p>
+      </div>
 
-        setMessages((prev) => [...prev, userMessage]);
-        setPrompt("");
+      {/* Horizontal gold rules */}
+      <div className="absolute top-0 left-0 right-0 h-px z-10"
+        style={{ background: "linear-gradient(to right, transparent, rgba(201,168,76,0.5) 20%, rgba(201,168,76,0.5) 80%, transparent)" }} />
+      <div className="absolute bottom-0 left-0 right-0 h-px z-10"
+        style={{ background: "linear-gradient(to right, transparent, rgba(201,168,76,0.5) 20%, rgba(201,168,76,0.5) 80%, transparent)" }} />
+      {/* Vertical gold rules */}
+      <div className="absolute top-0 bottom-0 left-0 w-px z-10"
+        style={{ background: "linear-gradient(to bottom, transparent, rgba(201,168,76,0.28) 20%, rgba(201,168,76,0.28) 80%, transparent)" }} />
+      <div className="absolute top-0 bottom-0 right-0 w-px z-10"
+        style={{ background: "linear-gradient(to bottom, transparent, rgba(201,168,76,0.28) 20%, rgba(201,168,76,0.28) 80%, transparent)" }} />
 
-        setTimeout(() => {
-          setMessages((prev) => [
-            ...prev,
-            { role: "ai", content: "Add an image." },
-          ]);
-        }, 500);
-      }
-    }}
-  />
-
-  
-
-<label className="mt-6 block cursor-pointer group">
-  <div className="relative h-44 w-full flex items-center justify-center transition-transform duration-300 group-hover:scale-[1.01]">
-
-    {/* Image */}
-   <span className="text-[11px] tracking-[0.2em] text-black/40 group-hover:text-black/80 transition-colors duration-[4000ms] ease-in-out">
-  {image ? "IMAGE ADDED" : "ADD IMAGE"}
-</span>
-
-    {/* Frame */}
-    <img
-  src="/frame.png"
-  className="absolute inset-0 w-full h-full object-contain pointer-events-none opacity-40 group-hover:opacity-90 transition-opacity duration-[1000ms] ease-in-out"
-/>
-
-  </div>
-
-  <input
-    type="file"
-    accept="image/*"
-    className="hidden"
-    onChange={(e) => {
-      const file = e.target.files?.[0];
-      if (!file) return;
-
-      const url = URL.createObjectURL(file);
-      setImage(url);
-    }}
-  />
-</label>
+      {/* Content */}
+      <div className="relative z-10 flex flex-col items-center text-center px-6 max-w-4xl mx-auto">
 
 
-</div>
+        {/* Top ornament */}
+        <div className="flex items-center gap-3 mb-6 w-96 max-w-full animate-fade-in" style={{ animationDelay: "0.2s" }}>
+          <div className="flex-1 h-px" style={{ background: "linear-gradient(to right, transparent, rgba(201,168,76,0.5))" }} />
+          <span style={{ color: "rgba(201,168,76,0.8)", fontSize: 11 }}>✦</span>
+          <div className="flex-1 h-px" style={{ background: "linear-gradient(to left, transparent, rgba(201,168,76,0.5))" }} />
+        </div>
 
-      {/* Garments */}
-     <div className="mt-16 grid grid-cols-2 gap-6">
-  {garments.map((g, i) => (
-    <GarmentCard
-      key={i}
-      name={g.name}
-      category={g.category}
-      image={g.image}
-    />
-  ))}
-</div>
+        {/* Logotype */}
+        <div className="relative w-full" style={{ overflow: "visible" }}>
+        <h1
+          className="leading-none animate-fade-in text-center w-full"
+          style={{
+            fontFamily: "Zyntro, serif",
+            fontSize: "clamp(5rem, 16vw, 14rem)",
+            fontWeight: 400,
+            fontVariant: "normal",
+            fontFeatureSettings: "'smcp' 0, 'c2sc' 0",
+            color: "#f0e6d0",
+            animationDelay: "0.3s",
+            textShadow: "0 2px 40px rgba(0,0,0,0.8)",
+            letterSpacing: "0.02em",
+          }}
+        >
+          ORDRE<span style={{ fontSize: "0.45em", verticalAlign: "baseline" }}>.</span>
+        </h1>
+        </div>
+
+        {/* Bottom ornament */}
+        <div className="flex items-center gap-3 mt-6 mb-6 w-96 max-w-full animate-fade-in" style={{ animationDelay: "0.4s" }}>
+          <div className="flex-1 h-px" style={{ background: "linear-gradient(to right, transparent, rgba(201,168,76,0.5))" }} />
+          <span style={{ color: "rgba(201,168,76,0.8)", fontSize: 11 }}>✦</span>
+          <div className="flex-1 h-px" style={{ background: "linear-gradient(to left, transparent, rgba(201,168,76,0.5))" }} />
+        </div>
+
+        {/* Tagline */}
+        <p
+          className="font-serif mb-5 animate-fade-in"
+          style={{
+            color: "#e8d5a0",
+            animationDelay: "0.5s",
+            textShadow: "0 1px 20px rgba(0,0,0,0.6)",
+            fontSize: "clamp(1.5rem, 2.8vw, 2.1rem)",
+          }}
+        >
+          Your aesthetic, articulated.
+        </p>
+
+        {/* Description */}
+        <p
+          className="font-sans font-light text-sm tracking-wide max-w-xs mb-14 leading-relaxed animate-fade-in"
+          style={{ color: "rgba(220,205,180,0.65)", animationDelay: "0.65s" }}
+        >
+          Describe a feeling. Share a reference.<br />
+          Receive a style direction that is precisely,<br />
+          unmistakably yours.
+        </p>
+
+        {/* CTA */}
+        <Link
+          href="/curator"
+          className="group relative inline-flex items-center gap-3 animate-fade-in"
+          style={{ animationDelay: "0.8s" }}
+        >
+          {/* Resting state — light gold fill + subtle border */}
+          <span className="absolute inset-0 transition-all duration-500"
+            style={{
+              background: "rgba(201,168,76,0.08)",
+              border: "1px solid rgba(201,168,76,0.45)",
+            }} />
+          {/* Hover state — stronger fill + glow */}
+          <span className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-all duration-500"
+            style={{
+              background: "rgba(201,168,76,0.18)",
+              border: "1px solid rgba(201,168,76,0.9)",
+            }} />
+          <span className="relative px-8 py-3 tracking-[0.3em] uppercase transition-colors duration-300 text-center"
+            style={{
+              fontFamily: "Zyntro, sans-serif",
+              fontSize: "0.75rem",
+              fontWeight: 400,
+              color: "rgba(201,168,76,0.9)",
+            }}>
+            Begin Your Curation
+          </span>
+        </Link>
+
+      </div>
     </main>
   );
 }
