@@ -3,6 +3,7 @@
 import { useRef, useState, useCallback, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import ProfileIntake, { UserProfile, buildProfileDescription } from "@/components/ProfileIntake";
 
 type MessageImage = {
   dataUrl: string;
@@ -30,6 +31,38 @@ type ApiMessage = {
   content: string | ApiContent[];
 };
 
+// Resize + convert image to JPEG via canvas, max 1600px, returns {base64, mediaType}
+async function processImage(file: File): Promise<MessageImage> {
+  return new Promise((resolve, reject) => {
+    const img = new window.Image();
+    const objectUrl = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(objectUrl);
+      const MAX = 1600;
+      let { width, height } = img;
+      if (width > MAX || height > MAX) {
+        if (width > height) {
+          height = Math.round((height * MAX) / width);
+          width = MAX;
+        } else {
+          width = Math.round((width * MAX) / height);
+          height = MAX;
+        }
+      }
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d")!;
+      ctx.drawImage(img, 0, 0, width, height);
+      const dataUrl = canvas.toDataURL("image/jpeg", 0.85);
+      const base64 = dataUrl.split(",")[1];
+      resolve({ dataUrl, mediaType: "image/jpeg", base64 });
+    };
+    img.onerror = reject;
+    img.src = objectUrl;
+  });
+}
+
 function buildApiMessages(displayMessages: DisplayMessage[]): ApiMessage[] {
   return displayMessages.map((msg) => {
     if (msg.role === "assistant" || !msg.images?.length) {
@@ -39,9 +72,8 @@ function buildApiMessages(displayMessages: DisplayMessage[]): ApiMessage[] {
       type: "image",
       source: { type: "base64", media_type: img.mediaType, data: img.base64 },
     }));
-    if (msg.text.trim()) {
-      content.push({ type: "text", text: msg.text });
-    }
+    // Always include a text block — Claude requires at least one
+    content.push({ type: "text", text: msg.text.trim() || "Please analyse these images and guide my style." });
     return { role: "user", content };
   });
 }
@@ -198,6 +230,8 @@ export default function CuratorPage() {
   const [input, setInput] = useState("");
   const [pendingImages, setPendingImages] = useState<MessageImage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [showIntake, setShowIntake] = useState(true);
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -212,25 +246,20 @@ export default function CuratorPage() {
   }, [messages, scrollToBottom]);
 
   const handleImageUpload = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
       const files = Array.from(e.target.files ?? []);
       if (!files.length) return;
 
-      files.forEach((file) => {
-        if (!file.type.startsWith("image/")) return;
-        const reader = new FileReader();
-        reader.onload = (ev) => {
-          const dataUrl = ev.target?.result as string;
-          const base64 = dataUrl.split(",")[1];
-          setPendingImages((prev) => [
-            ...prev,
-            { dataUrl, mediaType: file.type, base64 },
-          ]);
-        };
-        reader.readAsDataURL(file);
-      });
+      for (const file of files) {
+        if (!file.type.startsWith("image/")) continue;
+        try {
+          const processed = await processImage(file);
+          setPendingImages((prev) => [...prev, processed]);
+        } catch {
+          console.error("Failed to process image");
+        }
+      }
 
-      // Reset input so same file can be re-added
       if (fileInputRef.current) fileInputRef.current.value = "";
     },
     []
@@ -271,7 +300,10 @@ export default function CuratorPage() {
       const response = await fetch("/api/curator", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: apiMessages }),
+        body: JSON.stringify({
+          messages: apiMessages,
+          profile: userProfile ? buildProfileDescription(userProfile) : "",
+        }),
       });
 
       if (!response.ok) throw new Error("API error");
@@ -318,7 +350,7 @@ export default function CuratorPage() {
       setIsLoading(false);
       textareaRef.current?.focus();
     }
-  }, [input, pendingImages, messages, isLoading]);
+  }, [input, pendingImages, messages, isLoading, userProfile]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -346,6 +378,16 @@ export default function CuratorPage() {
       className="flex flex-col h-screen"
       style={{ background: "#080705" }}
     >
+      {/* Profile intake overlay */}
+      {showIntake && (
+        <ProfileIntake
+          onComplete={(p) => {
+            setUserProfile(p);
+            setShowIntake(false);
+          }}
+        />
+      )}
+
       {/* Header */}
       <header
         className="flex-shrink-0 flex items-center justify-between px-6 md:px-10 py-4"
@@ -439,30 +481,88 @@ export default function CuratorPage() {
         )}
 
         <div className="flex items-end gap-3 px-6 md:px-10 py-4">
-          {/* Image upload */}
+          {/* Image upload — Art Nouveau square button */}
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4, minWidth: "max-content" }}>
           <button
             onClick={() => fileInputRef.current?.click()}
             disabled={isLoading}
-            className="flex-shrink-0 flex items-center justify-center w-9 h-9 transition-colors duration-200 disabled:opacity-30"
+            className="flex-shrink-0 flex items-center justify-center transition-all duration-300 disabled:opacity-30 group"
             style={{
-              border: "1px solid rgba(201,168,76,0.2)",
-              color: "rgba(201,168,76,0.5)",
+              width: 38,
+              height: 38,
+              border: "1px solid rgba(201,168,76,0.15)",
+              background: "rgba(201,168,76,0.02)",
             }}
-            title="Attach images"
+            title="Attach image"
           >
-            <svg
-              width="14"
-              height="14"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.5"
+            <svg width="32" height="32" viewBox="0 0 40 40" fill="none"
+              stroke="rgba(201,168,76,0.75)" strokeWidth="0.42" strokeLinecap="round"
+              className="group-hover:stroke-[rgba(201,168,76,1)] transition-all duration-300"
             >
-              <rect x="3" y="3" width="18" height="18" rx="2" />
-              <circle cx="8.5" cy="8.5" r="1.5" />
-              <polyline points="21 15 16 10 5 21" />
+              {/* Outer border ring */}
+              <circle cx="20" cy="20" r="18.5" />
+
+              {/* Cusped Gothic scallop border — 16 sharp cusps */}
+              {(() => {
+                const n = 16, Ro = 17, Ri = 14.8;
+                const pts: string[] = [];
+                for (let i = 0; i <= n; i++) {
+                  const ap = 2 * Math.PI * i / n;
+                  const am = 2 * Math.PI * (i + 0.5) / n;
+                  const xp = 20 + Ro * Math.cos(ap), yp = 20 + Ro * Math.sin(ap);
+                  const xm = 20 + Ri * Math.cos(am), ym = 20 + Ri * Math.sin(am);
+                  if (i === 0) pts.push(`M${xp.toFixed(2)} ${yp.toFixed(2)}`);
+                  else pts.push(`L${xp.toFixed(2)} ${yp.toFixed(2)}`);
+                  if (i < n) pts.push(`L${xm.toFixed(2)} ${ym.toFixed(2)}`);
+                }
+                return <path d={pts.join(' ')} strokeOpacity="0.38" />;
+              })()}
+
+              {/* 12 primary Gothic lancets — pointed-arch Bézier curves */}
+              {[0,30,60,90,120,150,180,210,240,270,300,330].map(deg => (
+                <path key={deg}
+                  d="M -1.15 5.5 C -2.4 0.5 -0.65 -12.4 0 -13.2 C 0.65 -12.4 2.4 0.5 1.15 5.5"
+                  transform={`translate(20 20) rotate(${deg + 90})`}
+                  strokeOpacity="0.7"
+                />
+              ))}
+
+              {/* 12 secondary lancets at 15° offset — shorter, more delicate */}
+              {[15,45,75,105,135,165,195,225,255,285,315,345].map(deg => (
+                <path key={deg}
+                  d="M -0.72 8.2 C -1.5 4.2 -0.38 -6.8 0 -7.6 C 0.38 -6.8 1.5 4.2 0.72 8.2"
+                  transform={`translate(20 20) rotate(${deg + 90})`}
+                  strokeOpacity="0.28"
+                />
+              ))}
+
+              {/* Inner tracery ring */}
+              <circle cx="20" cy="20" r="5.2" strokeOpacity="0.25" />
+
+              {/* Central 6-petal rosette — tiny lancets */}
+              {[0,60,120,180,240,300].map(deg => (
+                <path key={deg}
+                  d="M -0.52 1.35 C -1.05 0.35 -0.28 -2.4 0 -2.7 C 0.28 -2.4 1.05 0.35 0.52 1.35"
+                  transform={`translate(20 20) rotate(${deg + 90})`}
+                  strokeOpacity="0.9"
+                />
+              ))}
+
+              {/* Oculus */}
+              <circle cx="20" cy="20" r="0.65" />
             </svg>
           </button>
+          <span style={{
+            display: "block",
+            fontFamily: "var(--font-jost)",
+            fontSize: "0.45rem",
+            letterSpacing: "0.2em",
+            textTransform: "uppercase",
+            color: "rgba(201,168,76,0.4)",
+            whiteSpace: "nowrap",
+            textAlign: "center",
+          }}>add image</span>
+          </div>
           <input
             ref={fileInputRef}
             type="file"

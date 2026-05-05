@@ -2,6 +2,38 @@
 @tailwind components;
 @tailwind utilities;
 
+@keyframes spin-slow {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+@keyframes feather-shimmer {
+  0%   { transform: skewX(-12deg) translateX(-150%); }
+  100% { transform: skewX(-12deg) translateX(350%); }
+}
+
+@keyframes film-grain {
+  0%   { transform: translate(0,    0);    }
+  10%  { transform: translate(-2%, -3%);  }
+  20%  { transform: translate( 3%,  1%);  }
+  30%  { transform: translate(-1%,  4%);  }
+  40%  { transform: translate( 4%, -2%);  }
+  50%  { transform: translate(-3%,  1%);  }
+  60%  { transform: translate( 1%,  3%);  }
+  70%  { transform: translate(-4%, -1%);  }
+  80%  { transform: translate( 2%, -3%);  }
+  90%  { transform: translate(-1%,  2%);  }
+  100% { transform: translate(0,    0);   }
+}
+
+@font-face {
+  font-family: "Zyntro";
+  src: url("/Zyntro-Regular.otf") format("opentype");
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
 :root {
   --font-cormorant: "Cormorant Garamond", serif;
   --font-jost: "Jost", sans-serif;
@@ -11,6 +43,7 @@
   box-sizing: border-box;
   margin: 0;
   padding: 0;
+  cursor: default !important;
 }
 
 html,

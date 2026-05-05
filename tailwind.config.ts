@@ -41,7 +41,7 @@ const config: Config = {
         "display-md": ["clamp(2rem, 5vw, 4rem)", { lineHeight: "1", letterSpacing: "0" }],
       },
       animation: {
-        "fade-in": "fadeIn 0.8s ease-out forwards",
+        "fade-in": "fadeIn 0.8s ease-out both",
         "slide-up": "slideUp 0.6s ease-out forwards",
         "cursor-blink": "cursorBlink 1s step-end infinite",
       },

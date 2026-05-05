@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Cormorant_Garamond, Jost } from "next/font/google";
+import { Cormorant_Garamond, Jost, Bodoni_Moda } from "next/font/google";
 import "./globals.css";
 
 const cormorant = Cormorant_Garamond({
@@ -7,6 +7,14 @@ const cormorant = Cormorant_Garamond({
   weight: ["300", "400", "500", "600"],
   style: ["normal", "italic"],
   variable: "--font-cormorant",
+  display: "swap",
+});
+
+const bodoni = Bodoni_Moda({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700", "800", "900"],
+  style: ["normal", "italic"],
+  variable: "--font-bodoni",
   display: "swap",
 });
 
@@ -28,7 +36,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={`${cormorant.variable} ${jost.variable}`}>
+    <html lang="en" className={`${cormorant.variable} ${jost.variable} ${bodoni.variable}`}>
       <body className="bg-obsidian text-cream font-sans antialiased">
         {children}
       </body>
