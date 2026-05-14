@@ -389,9 +389,9 @@ export default function CuratorPage() {
 
       {/* Header — hidden during intake */}
       <header
-        style={{ display: showIntake ? "none" : undefined }}
         className="flex-shrink-0 flex items-center justify-between px-6 md:px-10 py-4"
         style={{
+          display: showIntake ? "none" : undefined,
           borderBottom: "1px solid rgba(110,80,40,0.15)",
           background: "rgba(245,240,232,0.92)",
           backdropFilter: "blur(20px)",
