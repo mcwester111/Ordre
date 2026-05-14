@@ -22,7 +22,7 @@ Client profile: ${profile}
 
 Follow this exact format — no deviations, no extra text:
 
-[Two sentences, spoken directly to the client as "You", describing their likely physical presence, the mood they inhabit, and what they are instinctively drawn to. Be specific to their profile. Poetic but grounded. Do not begin with "You have" — begin with a more unexpected construction.]
+[Two sentences, spoken directly to the client as "You", describing their likely physical presence, the mood they inhabit, and what they are instinctively drawn to. Be specific to their profile — reference their colour world, their contrast level, their era, their form and sensibility directly. Poetic but grounded. Do not begin with "You have" — begin with a more unexpected construction.]
 
 Those who may share your sensibility:
 ✦ [Full name]
@@ -30,7 +30,7 @@ Those who may share your sensibility:
 ✦ [Full name]
 ✦ [Full name]
 
-The four figures should be drawn from fashion history, film, music, art, or cultural history. Choose figures most people would recognise — icons, cultural touchstones, household names. They should genuinely share this person's specific aesthetic spirit, colouring, or presence, but prioritise figures a general audience would know over obscure or niche references.
+Each of the four figures must be a precise, considered match — chosen because their specific colouring, aesthetic spirit, silhouette, or era genuinely mirrors this client's profile. These are people who would dress, move, and inhabit the world in a way that resonates with this exact profile. They may be drawn from fashion, film, music, art, literature or cultural history. At least three of the four must be widely known — think the level of Madonna, Audrey Hepburn, David Bowie, Cate Blanchett, Kate Moss. The fourth may be slightly less mainstream but still recognisable to anyone with a broad cultural education. Avoid designers, photographers, and art-world figures unless they are genuinely household names. Never suggest Siouxsie Sioux.
 
 No quotation marks. No exclamation marks. No pleasantries. No explanation of choices.`;
 

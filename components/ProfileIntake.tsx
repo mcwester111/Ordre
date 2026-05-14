@@ -109,13 +109,13 @@ const CONTRAST_OPTIONS = [
 
 /* ─── Shared style tokens ───────────────────────────────────────────────────── */
 const C = {
-  goldBright:  "rgba(201,168,76,1)",
-  goldMid:     "rgba(201,168,76,0.90)",
-  goldDim:     "rgba(201,168,76,0.65)",
-  goldHair:    "rgba(201,168,76,0.38)",
-  textBright:  "#f5e8c4",
-  textMid:     "rgba(235,220,195,0.95)",
-  textDim:     "rgba(225,210,185,0.75)",
+  goldBright:  "rgba(100,65,15,1)",
+  goldMid:     "rgba(100,65,15,0.85)",
+  goldDim:     "rgba(100,65,15,0.60)",
+  goldHair:    "rgba(100,65,15,0.28)",
+  textBright:  "#1A120A",
+  textMid:     "rgba(26,18,10,0.80)",
+  textDim:     "rgba(26,18,10,0.50)",
 };
 
 const labelStyle: React.CSSProperties = {
@@ -259,7 +259,7 @@ function StepContrast({ profile, setProfile }: { profile: UserProfile; setProfil
                 fontSize: "0.62rem",
                 letterSpacing: "0.04em",
                 lineHeight: 1.6,
-                color: sel ? "rgba(235,210,155,0.75)" : "rgba(200,185,160,0.5)",
+                color: sel ? "rgba(26,18,10,0.7)" : "rgba(26,18,10,0.42)",
                 transition: "color 0.25s",
               }}>
                 {opt.description}
@@ -304,7 +304,7 @@ function StepWorld({ profile, setProfile }: { profile: UserProfile; setProfile: 
               <div style={{
                 fontFamily: "var(--font-jost)", fontSize: "0.56rem",
                 letterSpacing: "0.03em", lineHeight: 1.55,
-                color: sel ? "rgba(235,210,155,0.7)" : "rgba(200,185,160,0.45)",
+                color: sel ? "rgba(26,18,10,0.7)" : "rgba(26,18,10,0.42)",
                 transition: "color 0.25s",
               }}>
                 {w.description}
@@ -394,10 +394,11 @@ function StepAesthetic({ profile, toggle }: { profile: UserProfile; toggle: (v: 
 
 /* ─── Summary / portrait step ───────────────────────────────────────────────── */
 
-function StepPortrait({ profile, onReady }: { profile: UserProfile; onReady: (portrait: string, figures: string[]) => void }) {
+function StepPortrait({ profile, onReady }: { profile: UserProfile; onReady: () => void }) {
   const [portrait, setPortrait] = useState("");
   const [names, setNames]       = useState<string[]>([]);
   const [loading, setLoading]   = useState(true);
+  const [error, setError]       = useState(false);
   const [revealed, setRevealed] = useState(false);
 
   useEffect(() => {
@@ -409,25 +410,39 @@ function StepPortrait({ profile, onReady }: { profile: UserProfile; onReady: (po
     })
       .then(r => r.json())
       .then(d => {
+        if (d.error) { setError(true); setLoading(false); setRevealed(true); onReady(); return; }
         const raw: string = d.summary ?? "";
-        // Split at the "Those who may share" heading
         const headingMatch = raw.search(/those who may share/i);
-        const portraitText = raw.slice(0, headingMatch >= 0 ? headingMatch : raw.length).trim();
-        const parsedNames = headingMatch >= 0
-          ? raw.slice(headingMatch).split("\n").filter(l => l.includes("✦")).map(l => l.replace("✦", "").trim())
-          : [];
-        setPortrait(portraitText);
-        setNames(parsedNames);
+        if (headingMatch >= 0) {
+          setPortrait(raw.slice(0, headingMatch).trim());
+          setNames(
+            raw.slice(headingMatch)
+              .split("\n")
+              .filter(l => l.includes("✦"))
+              .map(l => l.replace("✦", "").trim())
+          );
+        } else {
+          setPortrait(raw.trim());
+        }
         setLoading(false);
-        // slight delay before signalling the button is ready
-        setTimeout(() => {
-          setRevealed(true);
-          onReady(portraitText, parsedNames);
-        }, 400);
+        setTimeout(() => { setRevealed(true); onReady(); }, 400);
       })
-      .catch(() => { setLoading(false); setRevealed(true); onReady("", []); });
+      .catch(() => { setError(true); setLoading(false); setRevealed(true); onReady(); });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  if (error) {
+    return (
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "1rem", minHeight: 220, justifyContent: "center" }}>
+        <p style={{ fontFamily: "var(--font-cormorant)", fontStyle: "italic", fontSize: "1.1rem", color: C.textDim, textAlign: "center" }}>
+          Your portrait could not be drawn at this moment.
+        </p>
+        <p style={{ fontFamily: "var(--font-jost)", fontSize: "0.52rem", letterSpacing: "0.18em", color: C.textDim, opacity: 0.6, textAlign: "center" }}>
+          Please ensure your API key is configured, then try again.
+        </p>
+      </div>
+    );
+  }
 
   if (loading) {
     return (
@@ -435,7 +450,7 @@ function StepPortrait({ profile, onReady }: { profile: UserProfile; onReady: (po
         {/* Spinning rose window medallion */}
         <div style={{ animation: "spin-slow 6s linear infinite", width: 80, height: 80 }}>
           <svg width="80" height="80" viewBox="0 0 40 40" fill="none"
-            stroke="rgba(201,168,76,0.85)" strokeWidth="0.42" strokeLinecap="round">
+            stroke="rgba(100,65,15,0.7)" strokeWidth="0.42" strokeLinecap="round">
             <circle cx="20" cy="20" r="18.5" />
             {(() => {
               const n = 16, Ro = 17, Ri = 14.8;
@@ -498,15 +513,15 @@ function StepPortrait({ profile, onReady }: { profile: UserProfile; onReady: (po
 
       {/* Divider */}
       <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginBottom: "1.5rem" }}>
-        <div style={{ flex: 1, height: 1, background: "linear-gradient(to right, rgba(201,168,76,0.35), transparent)" }} />
+        <div style={{ flex: 1, height: 1, background: "linear-gradient(to right, rgba(110,80,40,0.3), transparent)" }} />
         <span style={{ ...labelStyle, fontSize: "0.48rem", letterSpacing: "0.28em" }}>
           those who may share your sensibility
         </span>
-        <div style={{ flex: 1, height: 1, background: "linear-gradient(to left, rgba(201,168,76,0.35), transparent)" }} />
+        <div style={{ flex: 1, height: 1, background: "linear-gradient(to left, rgba(110,80,40,0.3), transparent)" }} />
       </div>
 
       {/* Names */}
-      <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem", marginBottom: "2rem" }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
         {names.map((name, i) => (
           <div key={i} style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
             <span style={{ color: C.goldMid, fontSize: "0.65rem" }}>✦</span>
@@ -519,51 +534,6 @@ function StepPortrait({ profile, onReady }: { profile: UserProfile; onReady: (po
           </div>
         ))}
       </div>
-
-      {/* Rose window medallion — sits above the button which renders outside this component */}
-      <div style={{ display: "flex", justifyContent: "center", opacity: 0.65 }}>
-        <svg width="44" height="44" viewBox="0 0 40 40" fill="none"
-          stroke="rgba(201,168,76,1)" strokeWidth="0.42" strokeLinecap="round">
-          <circle cx="20" cy="20" r="18.5" />
-          {(() => {
-            const n = 16, Ro = 17, Ri = 14.8;
-            const pts: string[] = [];
-            for (let i = 0; i <= n; i++) {
-              const ap = 2 * Math.PI * i / n;
-              const am = 2 * Math.PI * (i + 0.5) / n;
-              const xp = 20 + Ro * Math.cos(ap), yp = 20 + Ro * Math.sin(ap);
-              const xm = 20 + Ri * Math.cos(am), ym = 20 + Ri * Math.sin(am);
-              if (i === 0) pts.push(`M${xp.toFixed(2)} ${yp.toFixed(2)}`);
-              else pts.push(`L${xp.toFixed(2)} ${yp.toFixed(2)}`);
-              if (i < n) pts.push(`L${xm.toFixed(2)} ${ym.toFixed(2)}`);
-            }
-            return <path d={pts.join(' ')} strokeOpacity="0.38" />;
-          })()}
-          {[0,30,60,90,120,150,180,210,240,270,300,330].map(deg => (
-            <path key={deg}
-              d="M -1.15 5.5 C -2.4 0.5 -0.65 -12.4 0 -13.2 C 0.65 -12.4 2.4 0.5 1.15 5.5"
-              transform={`translate(20 20) rotate(${deg + 90})`}
-              strokeOpacity="0.7"
-            />
-          ))}
-          {[15,45,75,105,135,165,195,225,255,285,315,345].map(deg => (
-            <path key={deg}
-              d="M -0.72 8.2 C -1.5 4.2 -0.38 -6.8 0 -7.6 C 0.38 -6.8 1.5 4.2 0.72 8.2"
-              transform={`translate(20 20) rotate(${deg + 90})`}
-              strokeOpacity="0.28"
-            />
-          ))}
-          <circle cx="20" cy="20" r="5.2" strokeOpacity="0.25" />
-          {[0,60,120,180,240,300].map(deg => (
-            <path key={deg}
-              d="M -0.52 1.35 C -1.05 0.35 -0.28 -2.4 0 -2.7 C 0.28 -2.4 1.05 0.35 0.52 1.35"
-              transform={`translate(20 20) rotate(${deg + 90})`}
-              strokeOpacity="0.9"
-            />
-          ))}
-          <circle cx="20" cy="20" r="0.65" />
-        </svg>
-      </div>
     </div>
   );
 }
@@ -572,29 +542,27 @@ function StepPortrait({ profile, onReady }: { profile: UserProfile; onReady: (po
 
 const STEP_ATMOSPHERES = [
   // 0 — Palette
-  { bg: "rgb(18,9,2)",    filter: "sepia(0.22) saturate(0.74)", watermark: "PALETTE",  rule: "rgba(201,140,60,0.42)" },
+  { bg: "rgb(242,237,228)", filter: "none", watermark: "PALETTE",  rule: "rgba(110,80,40,0.22)" },
   // 1 — Contrast
-  { bg: "rgb(18,9,2)",    filter: "sepia(0.22) saturate(0.74)", watermark: "TEINTE",   rule: "rgba(201,140,60,0.42)" },
+  { bg: "rgb(242,237,228)", filter: "none", watermark: "TEINTE",   rule: "rgba(110,80,40,0.22)" },
   // 2 — World
-  { bg: "rgb(18,9,2)",    filter: "sepia(0.22) saturate(0.74)", watermark: "MONDE",    rule: "rgba(201,140,60,0.42)" },
+  { bg: "rgb(242,237,228)", filter: "none", watermark: "MONDE",    rule: "rgba(110,80,40,0.22)" },
   // 3 — Silhouette
-  { bg: "rgb(18,9,2)",    filter: "sepia(0.22) saturate(0.74)", watermark: "FORME",    rule: "rgba(201,140,60,0.42)" },
+  { bg: "rgb(242,237,228)", filter: "none", watermark: "FORME",    rule: "rgba(110,80,40,0.22)" },
   // 4 — Aesthetic
-  { bg: "rgb(18,9,2)",    filter: "sepia(0.22) saturate(0.74)", watermark: "ESPRIT",   rule: "rgba(201,140,60,0.42)" },
-  // 5 — Portrait: richest near-black, gold-cast
-  { bg: "rgb(8,5,2)",     filter: "sepia(0.28) saturate(0.84)", watermark: "PORTRAIT", rule: "rgba(201,168,76,0.48)" },
+  { bg: "rgb(242,237,228)", filter: "none", watermark: "ESPRIT",   rule: "rgba(110,80,40,0.22)" },
+  // 5 — Portrait
+  { bg: "rgb(242,237,228)", filter: "none", watermark: "PORTRAIT", rule: "rgba(110,80,40,0.28)" },
 ];
 
 /* ─── Main component ────────────────────────────────────────────────────────── */
 
 const STEP_LABELS = ["palette", "complexion", "world", "form", "sensibility", "portrait"];
 
-export default function ProfileIntake({ onComplete }: { onComplete: (p: UserProfile, portrait: string, figures: string[]) => void }) {
+export default function ProfileIntake({ onComplete }: { onComplete: (p: UserProfile) => void }) {
   const [step, setStep] = useState(0);
   const [visible, setVisible] = useState(true);
   const [portraitReady, setPortraitReady] = useState(false);
-  const [portraitText, setPortraitText] = useState("");
-  const [portraitFigures, setPortraitFigures] = useState<string[]>([]);
   const [profile, setProfile] = useState<UserProfile>({
     colors: [], contrast: "", world: "", silhouette: "", aesthetic: [],
   });
@@ -614,11 +582,11 @@ export default function ProfileIntake({ onComplete }: { onComplete: (p: UserProf
       setVisible(false);
       setTimeout(() => { setStep(s => s + 1); setVisible(true); }, 280);
     } else {
-      onComplete(profile, portraitText, portraitFigures);
+      onComplete(profile);
     }
   };
 
-  const skip = () => onComplete(profile, "", []);
+  const skip = () => onComplete(profile);
 
   const clearSelection = () => {
     if (step === 0) setProfile(p => ({ ...p, colors: [] }));
@@ -653,33 +621,13 @@ export default function ProfileIntake({ onComplete }: { onComplete: (p: UserProf
   const atm = STEP_ATMOSPHERES[step];
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col items-center justify-center"
+    <div className="fixed inset-0 flex flex-col items-center justify-center"
       onClick={clearSelection}
       style={{
+        zIndex: 9998,
         background: atm.bg,
-        backdropFilter: "blur(12px)",
-        filter: atm.filter,
-        transition: "background 0.6s ease, filter 0.6s ease",
+        transition: "background 0.6s ease",
       }}>
-
-      {/* Film grain — coarse layer */}
-      <div aria-hidden style={{
-        position: "absolute", inset: "-50%", width: "200%", height: "200%",
-        pointerEvents: "none", zIndex: 0,
-        opacity: 0.38, mixBlendMode: "overlay",
-        animation: "film-grain 0.35s steps(1) infinite",
-        backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='280' height='280'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.68' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='280' height='280' filter='url(%23g)'/%3E%3C/svg%3E")`,
-        backgroundRepeat: "repeat", backgroundSize: "200px 200px",
-      }} />
-      {/* Film grain — fine layer */}
-      <div aria-hidden style={{
-        position: "absolute", inset: "-50%", width: "200%", height: "200%",
-        pointerEvents: "none", zIndex: 0,
-        opacity: 0.26, mixBlendMode: "soft-light",
-        animation: "film-grain 0.55s steps(1) infinite",
-        backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='g2'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.92' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23g2)'/%3E%3C/svg%3E")`,
-        backgroundRepeat: "repeat", backgroundSize: "120px 120px",
-      }} />
 
       {/* Top rule — colour shifts per step */}
       <div className="absolute top-0 left-0 right-0 h-px"
@@ -694,10 +642,10 @@ export default function ProfileIntake({ onComplete }: { onComplete: (p: UserProf
               width: i === step ? 28 : 8,
               borderRadius: 2,
               background: i < step
-                ? "rgba(201,168,76,0.55)"
+                ? "rgba(100,65,15,0.45)"
                 : i === step
-                ? "rgba(201,168,76,0.9)"
-                : "rgba(201,168,76,0.15)",
+                ? "rgba(100,65,15,0.85)"
+                : "rgba(100,65,15,0.12)",
               transition: "all 0.4s ease",
             }} />
           ))}
@@ -728,40 +676,39 @@ export default function ProfileIntake({ onComplete }: { onComplete: (p: UserProf
         {step === 2 && <StepWorld      profile={profile} setProfile={setProfile} />}
         {step === 3 && <StepSilhouette profile={profile} setProfile={setProfile} />}
         {step === 4 && <StepAesthetic  profile={profile} toggle={toggleAesthetic} />}
-        {step === 5 && <StepPortrait   profile={profile} onReady={(text, figs) => { setPortraitText(text); setPortraitFigures(figs); setPortraitReady(true); }} />}
+        {step === 5 && <StepPortrait   profile={profile} onReady={() => setPortraitReady(true)} />}
 
-        {/* Continue / Skip — counter-filter keeps gold vivid across all step atmospheres */}
-        <div style={{ filter: "saturate(2) brightness(1.12)", display: "flex", flexDirection: "column", alignItems: "center", visibility: IS_PORTRAIT && !portraitReady ? "hidden" : "visible" }}>
-
+        {/* Continue / Skip */}
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", visibility: IS_PORTRAIT && !portraitReady ? "hidden" : "visible" }}>
           <button
             onClick={advance}
             disabled={!canAdvance}
             className="group relative inline-flex items-center"
             style={{
-              marginTop: IS_PORTRAIT ? "0" : step === 0 ? "1rem" : step === 2 ? "0.75rem" : step === 4 ? "0.75rem" : "2.5rem",
-              opacity: canAdvance ? 1 : 0.32,
+              marginTop: IS_PORTRAIT ? "2.5rem" : step === 0 ? "1rem" : step === 2 ? "0.75rem" : step === 4 ? "0.75rem" : "2.5rem",
+              opacity: canAdvance ? 1 : 0.28,
               transition: IS_PORTRAIT ? "opacity 2.4s ease" : "opacity 0.5s",
             }}
           >
-            <span className="absolute inset-0" style={{ border: "1px solid rgba(201,168,76,0.7)", background: "rgba(201,168,76,0.08)" }} />
-            <span className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300" style={{ border: "1px solid rgba(201,168,76,0.95)", background: "rgba(201,168,76,0.18)" }} />
-            <span className="relative px-9 py-3" style={{ fontFamily: "var(--font-jost)", fontSize: "0.7rem", letterSpacing: "0.3em", textTransform: "uppercase", color: "rgba(220,188,90,1)" }}>
+            <span className="absolute inset-0" style={{ border: "1px solid #1A120A", background: "#1A120A" }} />
+            <span className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300" style={{ border: "1px solid #2C1E0F", background: "#2C1E0F" }} />
+            <span className="relative px-9 py-3" style={{ fontFamily: "var(--font-jost)", fontSize: "0.7rem", letterSpacing: "0.3em", textTransform: "uppercase", color: "#F5F0E8" }}>
               {IS_PORTRAIT ? "Begin Your Curation" : "Continue"}
             </span>
           </button>
 
           {/* Skip — hidden on portrait step */}
           {!IS_PORTRAIT && (
-            <button onClick={skip} style={{ marginTop: "1rem", fontFamily: "var(--font-jost)", fontSize: "0.52rem", letterSpacing: "0.22em", textTransform: "uppercase", color: "rgba(201,168,76,0.65)", background: "none", border: "none", cursor: "pointer" }}>
+            <button onClick={skip} style={{ marginTop: "1rem", fontFamily: "var(--font-jost)", fontSize: "0.52rem", letterSpacing: "0.22em", textTransform: "uppercase", color: "rgba(26,18,10,0.4)", background: "none", border: "none", cursor: "pointer" }}>
               Skip for now
             </button>
           )}
 
           {/* Back — shown from step 1 onward, hidden on portrait step */}
           {step > 0 && !IS_PORTRAIT && (
-            <button onClick={goBack} style={{ marginTop: "1.1rem", background: "none", border: "none", cursor: "pointer", color: "rgba(201,168,76,0.38)", fontSize: "0.9rem", lineHeight: 1, transition: "color 0.25s" }}
-              onMouseEnter={e => (e.currentTarget.style.color = "rgba(201,168,76,0.65)")}
-              onMouseLeave={e => (e.currentTarget.style.color = "rgba(201,168,76,0.38)")}
+            <button onClick={goBack} style={{ marginTop: "1.1rem", background: "none", border: "none", cursor: "pointer", color: "rgba(26,18,10,0.3)", fontSize: "0.9rem", lineHeight: 1, transition: "color 0.25s" }}
+              onMouseEnter={e => (e.currentTarget.style.color = "rgba(26,18,10,0.6)")}
+              onMouseLeave={e => (e.currentTarget.style.color = "rgba(26,18,10,0.3)")}
               title="Go back"
             >
               ↩

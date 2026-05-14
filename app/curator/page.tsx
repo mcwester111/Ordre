@@ -4,7 +4,6 @@ import { useRef, useState, useCallback, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import ProfileIntake, { UserProfile, buildProfileDescription } from "@/components/ProfileIntake";
-import ReportOfferCard from "@/components/ReportOfferCard";
 
 type MessageImage = {
   dataUrl: string;
@@ -18,7 +17,6 @@ type DisplayMessage = {
   text: string;
   images?: MessageImage[];
   isStreaming?: boolean;
-  reportReady?: boolean; // signals that a style report offer should appear
 };
 
 type ApiContent =
@@ -87,15 +85,15 @@ function OrnamentDivider() {
         className="flex-1 h-px"
         style={{
           background:
-            "linear-gradient(to right, transparent, rgba(201,168,76,0.2))",
+            "linear-gradient(to right, transparent, rgba(110,80,40,0.2))",
         }}
       />
-      <span className="text-gold-dim text-[10px]">✦</span>
+      <span className="text-[10px]" style={{ color: "rgba(110,80,40,0.4)" }}>✦</span>
       <div
         className="flex-1 h-px"
         style={{
           background:
-            "linear-gradient(to left, transparent, rgba(201,168,76,0.2))",
+            "linear-gradient(to left, transparent, rgba(110,80,40,0.2))",
         }}
       />
     </div>
@@ -111,7 +109,7 @@ function AssistantMessage({
     <div className="flex gap-4 px-6 md:px-10 py-2">
       {/* Label */}
       <div className="flex-shrink-0 w-16 pt-1 hidden md:block">
-        <span className="font-serif italic text-xs text-gold-dim tracking-wide">
+        <span className="font-serif italic text-xs tracking-wide" style={{ color: "rgba(100,65,15,0.6)" }}>
           Ordre.
         </span>
       </div>
@@ -121,17 +119,17 @@ function AssistantMessage({
         <div
           className="relative pl-4"
           style={{
-            borderLeft: "1px solid rgba(201,168,76,0.25)",
+            borderLeft: "1px solid rgba(110,80,40,0.2)",
           }}
         >
           <div
-            className={`font-sans font-light text-sm leading-relaxed text-cream prose-curator ${
+            className={`font-sans font-light text-sm leading-relaxed prose-curator ${
               message.isStreaming ? "streaming-cursor" : ""
             }`}
-            style={{ whiteSpace: "pre-wrap" }}
+            style={{ whiteSpace: "pre-wrap", color: "#1A120A" }}
           >
             {message.text || (
-              <span className="text-cream-muted italic text-xs">
+              <span className="italic text-xs" style={{ color: "rgba(26,18,10,0.4)" }}>
                 Considering your aesthetic...
               </span>
             )}
@@ -174,18 +172,18 @@ function UserMessage({ message }: { message: DisplayMessage }) {
         <div
           className="max-w-sm px-4 py-3"
           style={{
-            background: "rgba(201,168,76,0.06)",
-            border: "1px solid rgba(201,168,76,0.15)",
+            background: "rgba(110,80,40,0.05)",
+            border: "1px solid rgba(110,80,40,0.15)",
           }}
         >
-          <p className="font-sans font-light text-sm text-cream leading-relaxed">
+          <p className="font-sans font-light text-sm leading-relaxed" style={{ color: "#1A120A" }}>
             {message.text}
           </p>
         </div>
       )}
 
       {/* Label */}
-      <span className="font-sans text-[10px] tracking-wider uppercase text-cream-muted opacity-40">
+      <span className="font-sans text-[10px] tracking-wider uppercase" style={{ color: "rgba(26,18,10,0.35)" }}>
         You
       </span>
     </div>
@@ -199,28 +197,28 @@ function EmptyState() {
         <div
           className="w-16 h-16 border mx-auto"
           style={{
-            borderColor: "rgba(201,168,76,0.4)",
+            borderColor: "rgba(110,80,40,0.4)",
             background:
-              "linear-gradient(135deg, transparent 40%, rgba(201,168,76,0.08) 100%)",
+              "linear-gradient(135deg, transparent 40%, rgba(110,80,40,0.06) 100%)",
           }}
         />
       </div>
-      <h2 className="font-serif text-3xl italic text-cream-dim mb-3">
+      <h2 className="font-serif text-3xl italic mb-3" style={{ color: "rgba(26,18,10,0.65)" }}>
         Begin your curation
       </h2>
-      <p className="font-sans font-light text-xs tracking-wide text-cream-muted max-w-xs leading-relaxed">
+      <p className="font-sans font-light text-xs tracking-wide max-w-xs leading-relaxed" style={{ color: "rgba(26,18,10,0.45)" }}>
         Share images that speak to you — editorials, street photography, film
         stills, interiors. Or describe the aesthetic you want to embody.
       </p>
       <div className="mt-8 flex items-center gap-3 opacity-30">
         <div
           className="w-12 h-px"
-          style={{ background: "rgba(201,168,76,0.5)" }}
+          style={{ background: "rgba(110,80,40,0.5)" }}
         />
-        <span className="text-gold text-[10px]">✦</span>
+        <span className="text-[10px]" style={{ color: "rgba(110,80,40,0.8)" }}>✦</span>
         <div
           className="w-12 h-px"
-          style={{ background: "rgba(201,168,76,0.5)" }}
+          style={{ background: "rgba(110,80,40,0.5)" }}
         />
       </div>
     </div>
@@ -234,8 +232,6 @@ export default function CuratorPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [showIntake, setShowIntake] = useState(true);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
-  const [userPortrait, setUserPortrait] = useState("");
-  const [userFigures, setUserFigures] = useState<string[]>([]);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -331,19 +327,12 @@ export default function CuratorPage() {
         });
       }
 
-      // Detect report-ready signal, strip it from display text
-      const REPORT_TOKEN = "[REPORT_READY]";
-      const hasReportSignal = streamedText.includes(REPORT_TOKEN);
-      const cleanText = streamedText.replace(REPORT_TOKEN, "").trimEnd();
-
-      // Mark streaming as done, apply cleaned text and report flag
+      // Mark streaming as done
       setMessages((prev) => {
         const updated = [...prev];
         updated[updated.length - 1] = {
           ...updated[updated.length - 1],
-          text: cleanText,
           isStreaming: false,
-          reportReady: hasReportSignal,
         };
         return updated;
       });
@@ -362,47 +351,6 @@ export default function CuratorPage() {
       textareaRef.current?.focus();
     }
   }, [input, pendingImages, messages, isLoading, userProfile]);
-
-  const handleGenerateReport = useCallback(async () => {
-    const profile = userProfile ? buildProfileDescription(userProfile) : "";
-    const apiMessages = buildApiMessages(messages.filter(m => !m.isStreaming));
-
-    // Step 1: generate the report JSON via Claude
-    const genRes = await fetch("/api/generate-report", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        messages: apiMessages,
-        profile,
-        portrait: userPortrait,
-      }),
-    });
-    if (!genRes.ok) throw new Error("Report generation failed");
-    const { reportData } = await genRes.json();
-
-    // Step 2: generate and download the PDF
-    const pdfRes = await fetch("/api/download-report", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        reportData,
-        portrait: userPortrait,
-        figures: userFigures,
-      }),
-    });
-    if (!pdfRes.ok) throw new Error("PDF download failed");
-
-    // Trigger browser download
-    const blob = await pdfRes.blob();
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "ordre-style-report.pdf";
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  }, [messages, userProfile, userPortrait, userFigures]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -428,48 +376,46 @@ export default function CuratorPage() {
   return (
     <div
       className="flex flex-col h-screen"
-      style={{ background: "#080705" }}
     >
       {/* Profile intake overlay */}
       {showIntake && (
         <ProfileIntake
-          onComplete={(p, portrait, figures) => {
+          onComplete={(p) => {
             setUserProfile(p);
-            setUserPortrait(portrait);
-            setUserFigures(figures);
             setShowIntake(false);
           }}
         />
       )}
 
-      {/* Header */}
+      {/* Header — hidden during intake */}
       <header
+        style={{ display: showIntake ? "none" : undefined }}
         className="flex-shrink-0 flex items-center justify-between px-6 md:px-10 py-4"
         style={{
-          borderBottom: "1px solid rgba(201,168,76,0.12)",
-          background: "rgba(8,7,5,0.95)",
+          borderBottom: "1px solid rgba(110,80,40,0.15)",
+          background: "rgba(245,240,232,0.92)",
           backdropFilter: "blur(20px)",
         }}
       >
         <Link href="/" className="group flex items-center gap-3">
-          <span className="font-serif text-xl text-cream transition-colors duration-300 group-hover:text-gold-light">
+          <span className="font-serif text-xl transition-colors duration-300" style={{ color: "#1A120A" }}>
             Ordre.
           </span>
         </Link>
 
         <div className="flex items-center gap-2">
           <div
-            className="w-1.5 h-1.5 rounded-full bg-gold opacity-60"
-            style={{ animation: isLoading ? "none" : undefined }}
+            className="w-1.5 h-1.5 rounded-full opacity-60"
+            style={{ background: "rgba(100,65,15,0.7)" }}
           />
-          <span className="font-sans text-[10px] tracking-widest uppercase text-cream-muted opacity-50">
+          <span className="font-sans text-[10px] tracking-widest uppercase" style={{ color: "rgba(26,18,10,0.4)" }}>
             {isLoading ? "Curating" : "Active"}
           </span>
         </div>
       </header>
 
-      {/* Messages area */}
-      <div className="flex-1 overflow-y-auto">
+      {/* Messages area — hidden during intake */}
+      <div className="flex-1 overflow-y-auto" style={{ visibility: showIntake ? "hidden" : "visible" }}>
         {messages.length === 0 ? (
           <EmptyState />
         ) : (
@@ -486,14 +432,6 @@ export default function CuratorPage() {
                 ) : (
                   <UserMessage message={msg} />
                 )}
-                {/* Report offer card — appears after the assistant message that signals readiness */}
-                {msg.role === "assistant" && msg.reportReady && (
-                  <div className="px-6 md:px-10">
-                    <div className="md:ml-20">
-                      <ReportOfferCard onGenerate={handleGenerateReport} />
-                    </div>
-                  </div>
-                )}
               </div>
             ))}
           </div>
@@ -501,12 +439,13 @@ export default function CuratorPage() {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Input area */}
+      {/* Input area — hidden during intake */}
       <div
         className="flex-shrink-0"
         style={{
-          borderTop: "1px solid rgba(201,168,76,0.12)",
-          background: "rgba(8,7,5,0.98)",
+          display: showIntake ? "none" : undefined,
+          borderTop: "1px solid rgba(110,80,40,0.15)",
+          background: "rgba(245,240,232,0.97)",
           backdropFilter: "blur(20px)",
         }}
       >
@@ -552,14 +491,14 @@ export default function CuratorPage() {
             style={{
               width: 38,
               height: 38,
-              border: "1px solid rgba(201,168,76,0.15)",
-              background: "rgba(201,168,76,0.02)",
+              border: "1px solid rgba(110,80,40,0.15)",
+              background: "rgba(110,80,40,0.02)",
             }}
             title="Attach image"
           >
             <svg width="32" height="32" viewBox="0 0 40 40" fill="none"
-              stroke="rgba(201,168,76,0.75)" strokeWidth="0.42" strokeLinecap="round"
-              className="group-hover:stroke-[rgba(201,168,76,1)] transition-all duration-300"
+              stroke="rgba(110,80,40,0.55)" strokeWidth="0.42" strokeLinecap="round"
+              className="transition-all duration-300"
             >
               {/* Outer border ring */}
               <circle cx="20" cy="20" r="18.5" />
@@ -620,7 +559,7 @@ export default function CuratorPage() {
             fontSize: "0.45rem",
             letterSpacing: "0.2em",
             textTransform: "uppercase",
-            color: "rgba(201,168,76,0.4)",
+            color: "rgba(110,80,40,0.4)",
             whiteSpace: "nowrap",
             textAlign: "center",
           }}>add image</span>
@@ -643,12 +582,13 @@ export default function CuratorPage() {
             placeholder="Describe your vision, or share an image…"
             disabled={isLoading}
             rows={1}
-            className="flex-1 bg-transparent font-sans font-light text-sm text-cream placeholder:text-cream-muted placeholder:opacity-30 disabled:opacity-40 py-2"
+            className="flex-1 bg-transparent font-sans font-light text-sm disabled:opacity-40 py-2"
             style={{
               minHeight: "36px",
               maxHeight: "160px",
               lineHeight: "1.6",
-              caretColor: "#c9a84c",
+              caretColor: "#1A120A",
+              color: "#1A120A",
             }}
           />
 
@@ -658,17 +598,17 @@ export default function CuratorPage() {
             disabled={isLoading || (!input.trim() && !pendingImages.length)}
             className="flex-shrink-0 flex items-center justify-center w-9 h-9 transition-all duration-300 disabled:opacity-20 group"
             style={{
-              border: "1px solid rgba(201,168,76,0.35)",
+              border: "1px solid rgba(110,80,40,0.3)",
               background:
                 isLoading || (!input.trim() && !pendingImages.length)
                   ? "transparent"
-                  : "rgba(201,168,76,0.08)",
+                  : "rgba(110,80,40,0.06)",
             }}
           >
             {isLoading ? (
               <span
-                className="block w-3 h-3 border border-gold-dim border-t-gold rounded-full"
-                style={{ animation: "spin 0.8s linear infinite" }}
+                className="block w-3 h-3 rounded-full"
+                style={{ border: "1px solid rgba(110,80,40,0.3)", borderTopColor: "rgba(110,80,40,0.8)", animation: "spin 0.8s linear infinite" }}
               />
             ) : (
               <svg
@@ -676,9 +616,8 @@ export default function CuratorPage() {
                 height="13"
                 viewBox="0 0 24 24"
                 fill="none"
-                stroke="rgba(201,168,76,0.7)"
+                stroke="rgba(110,80,40,0.6)"
                 strokeWidth="1.5"
-                className="transition-colors duration-200 group-hover:stroke-gold"
               >
                 <line x1="5" y1="12" x2="19" y2="12" />
                 <polyline points="12 5 19 12 12 19" />
@@ -688,7 +627,7 @@ export default function CuratorPage() {
         </div>
 
         {/* Hint */}
-        <p className="pb-3 px-6 md:px-10 font-sans text-[10px] tracking-wide text-cream-muted opacity-20">
+        <p className="pb-3 px-6 md:px-10 font-sans text-[10px] tracking-wide opacity-30" style={{ color: "rgba(26,18,10,0.5)" }}>
           Return to send &nbsp;·&nbsp; Shift + Return for new line
         </p>
       </div>

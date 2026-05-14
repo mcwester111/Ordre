@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Cormorant_Garamond, Jost, Bodoni_Moda } from "next/font/google";
+import SplashScreen from "@/components/SplashScreen";
 import "./globals.css";
 
 const cormorant = Cormorant_Garamond({
@@ -37,7 +38,8 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className={`${cormorant.variable} ${jost.variable} ${bodoni.variable}`}>
-      <body className="bg-obsidian text-cream font-sans antialiased">
+      <body className="font-sans antialiased">
+        <SplashScreen />
         {children}
       </body>
     </html>
