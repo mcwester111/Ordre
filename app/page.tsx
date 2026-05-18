@@ -5,6 +5,7 @@ import Image from "next/image";
 import { useEffect, useRef } from "react";
 import { splashIsDone } from "@/lib/splash-signal";
 import Footer from "@/components/Footer";
+import SplashScreen from "@/components/SplashScreen";
 
 
 export default function LandingPage() {
@@ -91,6 +92,7 @@ export default function LandingPage() {
 
   return (
     <main className="relative min-h-screen overflow-hidden flex flex-col items-center">
+      <SplashScreen />
 
       {/* Horizontal rules */}
       <div className="absolute top-0 left-0 right-0 h-px z-10"

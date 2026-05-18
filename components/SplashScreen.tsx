@@ -1,28 +1,16 @@
 "use client";
 import { useEffect, useState } from "react";
-import { usePathname } from "next/navigation";
 import { signalSplashDone } from "@/lib/splash-signal";
 
 export default function SplashScreen() {
-  const pathname = usePathname();
-  const [phase, setPhase] = useState<"visible" | "fading" | "gone">(
-    pathname !== "/" ? "gone" : "visible"
-  );
+  const [phase, setPhase] = useState<"visible" | "fading" | "gone">("visible");
 
   useEffect(() => {
-    // Only show the splash on the home page.
-    if (pathname !== "/") {
-      signalSplashDone();
-      return;
-    }
     const fadeTimer   = setTimeout(() => setPhase("fading"), 4200);
-    // Signal the landing page as the splash fade is ~80% through (~230ms into
-    // the 280ms transition) so the swan begins emerging while the splash is
-    // still dissolving — a natural overlap rather than a blank-parchment gap.
     const signalTimer = setTimeout(signalSplashDone, 4430);
     const goneTimer   = setTimeout(() => setPhase("gone"), 5200);
     return () => { clearTimeout(fadeTimer); clearTimeout(signalTimer); clearTimeout(goneTimer); };
-  }, [pathname]);
+  }, []);
 
   if (phase === "gone") return null;
 
