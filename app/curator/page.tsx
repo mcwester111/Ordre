@@ -4,6 +4,22 @@ import { useRef, useState, useCallback, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import ProfileIntake, { UserProfile, buildProfileDescription } from "@/components/ProfileIntake";
+import ProfilePanel from "@/components/ProfilePanel";
+import { AiNotes, EMPTY_NOTES, getAiNotes, getAccount, buildNotesDescription } from "@/lib/account";
+import {
+  loadProfileFromSupabase,
+  loadProfileFromStorage,
+  saveProfileToSupabase,
+  saveProfileToStorage,
+} from "@/lib/profile";
+import {
+  createConversation,
+  listConversations,
+  loadConversationMessages,
+  saveMessage,
+  updateConversationTitle,
+  ConversationRow,
+} from "@/lib/conversations";
 
 type MessageImage = {
   dataUrl: string;
@@ -11,11 +27,18 @@ type MessageImage = {
   base64: string;
 };
 
+type MessageDoc = {
+  name: string;
+  mediaType: string; // "application/pdf" | "text/plain"
+  data: string;      // base64 for PDF, raw text for text/plain
+};
+
 type DisplayMessage = {
   id: string;
   role: "user" | "assistant";
   text: string;
   images?: MessageImage[];
+  docs?: MessageDoc[];
   isStreaming?: boolean;
 };
 
@@ -24,12 +47,28 @@ type ApiContent =
   | {
       type: "image";
       source: { type: "base64"; media_type: string; data: string };
+    }
+  | {
+      type: "document";
+      title?: string;
+      source:
+        | { type: "base64"; media_type: "application/pdf"; data: string }
+        | { type: "text"; media_type: "text/plain"; data: string };
     };
 
 type ApiMessage = {
   role: "user" | "assistant";
   content: string | ApiContent[];
 };
+
+// ── Upload safety limits ───────────────────────────────────────────────────
+// Allowlist-based handling plus hard caps so a malicious or runaway upload
+// can't exhaust memory or balloon the API payload.
+const MAX_FILES_PER_ADD = 20;               // per selection / folder
+const MAX_ATTACHMENTS = 24;                  // total queued at once
+const MAX_IMAGE_BYTES = 25 * 1024 * 1024;    // 25 MB (before downscale)
+const MAX_PDF_BYTES = 20 * 1024 * 1024;      // 20 MB
+const MAX_TEXT_BYTES = 1 * 1024 * 1024;      // 1 MB
 
 // Resize + convert image to JPEG via canvas, max 1600px, returns {base64, mediaType}
 async function processImage(file: File): Promise<MessageImage> {
@@ -65,39 +104,50 @@ async function processImage(file: File): Promise<MessageImage> {
 
 function buildApiMessages(displayMessages: DisplayMessage[]): ApiMessage[] {
   return displayMessages.map((msg) => {
-    if (msg.role === "assistant" || !msg.images?.length) {
+    const hasMedia = !!(msg.images?.length || msg.docs?.length);
+    if (msg.role === "assistant" || !hasMedia) {
       return { role: msg.role, content: msg.text };
     }
-    const content: ApiContent[] = msg.images.map((img) => ({
-      type: "image",
-      source: { type: "base64", media_type: img.mediaType, data: img.base64 },
-    }));
-    // Always include a text block — Claude requires at least one
-    content.push({ type: "text", text: msg.text.trim() || "Please analyse these images and guide my style." });
+    const content: ApiContent[] = [];
+
+    msg.images?.forEach((img) => {
+      content.push({
+        type: "image",
+        source: { type: "base64", media_type: img.mediaType, data: img.base64 },
+      });
+    });
+
+    msg.docs?.forEach((doc) => {
+      if (doc.mediaType === "application/pdf") {
+        content.push({
+          type: "document",
+          title: doc.name,
+          source: { type: "base64", media_type: "application/pdf", data: doc.data },
+        });
+      } else {
+        content.push({
+          type: "document",
+          title: doc.name,
+          source: { type: "text", media_type: "text/plain", data: doc.data },
+        });
+      }
+    });
+
+    // Always include a text block — Claude requires at least one.
+    content.push({
+      type: "text",
+      text: msg.text.trim() || "Please consider what I've shared and guide my style.",
+    });
     return { role: "user", content };
   });
 }
 
-function OrnamentDivider() {
-  return (
-    <div className="flex items-center gap-3 my-8 px-6 md:px-10">
-      <div
-        className="flex-1 h-px"
-        style={{
-          background:
-            "linear-gradient(to right, transparent, rgba(201,168,76,0.2))",
-        }}
-      />
-      <span className="text-gold-dim text-[10px]">✦</span>
-      <div
-        className="flex-1 h-px"
-        style={{
-          background:
-            "linear-gradient(to left, transparent, rgba(201,168,76,0.2))",
-        }}
-      />
-    </div>
-  );
+// Strip markdown asterisk formatting — the curator writes plain prose,
+// so **bold** and *italic* syntax should never appear as literal characters.
+function stripMarkdown(text: string): string {
+  return text
+    .replace(/\*\*([^*]+)\*\*/g, "$1")
+    .replace(/\*([^*]+)\*/g, "$1");
 }
 
 function AssistantMessage({
@@ -106,34 +156,21 @@ function AssistantMessage({
   message: DisplayMessage;
 }) {
   return (
-    <div className="flex gap-4 px-6 md:px-10 py-2">
-      {/* Label */}
-      <div className="flex-shrink-0 w-16 pt-1 hidden md:block">
-        <span className="font-serif italic text-xs text-gold-dim tracking-wide">
-          Ordre.
-        </span>
-      </div>
-
-      {/* Message */}
-      <div className="flex-1 max-w-2xl">
+    <div className="flex px-6 md:px-10 py-3">
+      <div className="max-w-2xl">
         <div
-          className="relative pl-4"
-          style={{
-            borderLeft: "1px solid rgba(201,168,76,0.25)",
-          }}
+          className={`font-sans text-[15px] leading-7 prose-curator ${
+            message.isStreaming ? "streaming-cursor" : ""
+          }`}
+          style={{ whiteSpace: "pre-wrap", color: "#1A120A", letterSpacing: "0", fontFamily: "var(--font-inter)" }}
         >
-          <div
-            className={`font-sans font-light text-sm leading-relaxed text-cream prose-curator ${
-              message.isStreaming ? "streaming-cursor" : ""
-            }`}
-            style={{ whiteSpace: "pre-wrap" }}
-          >
-            {message.text || (
-              <span className="text-cream-muted italic text-xs">
-                Considering your aesthetic...
-              </span>
-            )}
-          </div>
+          {message.text ? (
+            stripMarkdown(message.text)
+          ) : (
+            <span className="italic text-xs" style={{ color: "rgba(26,18,10,0.4)" }}>
+              Considering your aesthetic...
+            </span>
+          )}
         </div>
       </div>
     </div>
@@ -167,25 +204,42 @@ function UserMessage({ message }: { message: DisplayMessage }) {
         </div>
       )}
 
-      {/* Text */}
-      {message.text.trim() && (
-        <div
-          className="max-w-sm px-4 py-3"
-          style={{
-            background: "rgba(201,168,76,0.06)",
-            border: "1px solid rgba(201,168,76,0.15)",
-          }}
-        >
-          <p className="font-sans font-light text-sm text-cream leading-relaxed">
-            {message.text}
-          </p>
+      {/* Document chips */}
+      {message.docs && message.docs.length > 0 && (
+        <div className="flex flex-wrap gap-2 justify-end">
+          {message.docs.map((doc, i) => (
+            <div
+              key={i}
+              className="flex items-center gap-2"
+              style={{
+                maxWidth: 220,
+                padding: "6px 10px",
+                borderRadius: "10px",
+                background: "rgba(248,243,234,0.7)",
+                border: "1px solid rgba(26,18,10,0.12)",
+              }}
+            >
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="rgba(26,18,10,0.55)" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                <polyline points="14 2 14 8 20 8" />
+              </svg>
+              <span className="truncate" style={{ fontFamily: "var(--font-inter)", fontSize: "12.5px", color: "rgba(26,18,10,0.8)" }} title={doc.name}>
+                {doc.name}
+              </span>
+            </div>
+          ))}
         </div>
       )}
 
-      {/* Label */}
-      <span className="font-sans text-[10px] tracking-wider uppercase text-cream-muted opacity-40">
-        You
-      </span>
+      {/* Text — no box, no label; the user's own words, right-aligned */}
+      {message.text.trim() && (
+        <p
+          className="max-w-md text-right text-[15px] leading-7"
+          style={{ color: "rgba(26,18,10,0.92)", letterSpacing: "0", fontFamily: "var(--font-inter)" }}
+        >
+          {message.text}
+        </p>
+      )}
     </div>
   );
 }
@@ -193,32 +247,25 @@ function UserMessage({ message }: { message: DisplayMessage }) {
 function EmptyState() {
   return (
     <div className="flex flex-col items-center justify-center h-full text-center px-6 pb-24">
-      <div className="mb-8 opacity-20">
-        <div
-          className="w-16 h-16 border mx-auto"
-          style={{
-            borderColor: "rgba(201,168,76,0.4)",
-            background:
-              "linear-gradient(135deg, transparent 40%, rgba(201,168,76,0.08) 100%)",
-          }}
-        />
-      </div>
-      <h2 className="font-serif text-3xl italic text-cream-dim mb-3">
-        Begin your curation
-      </h2>
-      <p className="font-sans font-light text-xs tracking-wide text-cream-muted max-w-xs leading-relaxed">
-        Share images that speak to you — editorials, street photography, film
-        stills, interiors. Or describe the aesthetic you want to embody.
+      <p className="text-[13px] tracking-wide max-w-xs leading-relaxed" style={{ color: "rgba(26,18,10,0.55)", fontFamily: "var(--font-inter)" }}>
+        Describe the aesthetic you want to embody. Or, share images that speak
+        to you — editorials, street photography, film stills, interiors.
       </p>
-      <div className="mt-8 flex items-center gap-3 opacity-30">
+      <div className="mt-3 flex items-center gap-3" style={{ opacity: 0.55, filter: "brightness(1.15)" }}>
         <div
           className="w-12 h-px"
-          style={{ background: "rgba(201,168,76,0.5)" }}
+          style={{ background: "rgba(26,18,10,0.55)" }}
         />
-        <span className="text-gold text-[10px]">✦</span>
+        <Image
+          src="/swan-logo.png"
+          alt="Ordre"
+          width={24}
+          height={17}
+          style={{ objectFit: "contain", display: "block" }}
+        />
         <div
           className="w-12 h-px"
-          style={{ background: "rgba(201,168,76,0.5)" }}
+          style={{ background: "rgba(26,18,10,0.55)" }}
         />
       </div>
     </div>
@@ -229,13 +276,86 @@ export default function CuratorPage() {
   const [messages, setMessages] = useState<DisplayMessage[]>([]);
   const [input, setInput] = useState("");
   const [pendingImages, setPendingImages] = useState<MessageImage[]>([]);
+  const [pendingDocs, setPendingDocs] = useState<MessageDoc[]>([]);
+  const [fileNotice, setFileNotice] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [showIntake, setShowIntake] = useState(true);
+  const [showProfile, setShowProfile] = useState(false);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [aiNotes, setAiNotes] = useState<AiNotes>(EMPTY_NOTES);
+  const [clientName, setClientName] = useState<string>("");
+  const [plusOpen, setPlusOpen] = useState(false);
+  const [conversationId, setConversationId] = useState<string | null>(null);
+  const [conversations, setConversations] = useState<ConversationRow[]>([]);
+  const [showHistory, setShowHistory] = useState(false);
+  // Gate the first paint until we've checked storage, so returning clients
+  // don't see a flash of the intake before it's skipped.
+  const [hydrated, setHydrated] = useState(false);
+
+  // Load a saved aesthetic profile — a returning client skips the intake.
+  // Try Supabase first (signed-in users), fall back to localStorage.
+  useEffect(() => {
+    async function loadProfile() {
+      const fromSupabase = await loadProfileFromSupabase();
+      if (fromSupabase) {
+        setUserProfile(fromSupabase);
+        setShowIntake(false);
+        saveProfileToStorage(fromSupabase); // keep local cache in sync
+      } else {
+        const fromStorage = loadProfileFromStorage();
+        if (fromStorage) {
+          setUserProfile(fromStorage);
+          setShowIntake(false);
+        }
+      }
+      setAiNotes(getAiNotes());
+      const account = getAccount();
+      if (account?.name) setClientName(account.name);
+
+      // Load conversation history for signed-in users
+      const convos = await listConversations();
+      if (convos.length > 0) {
+        setConversations(convos);
+        const latest = convos[0];
+        const msgs = await loadConversationMessages(latest.id);
+        if (msgs.length > 0) {
+          setConversationId(latest.id);
+          setMessages(msgs.map((m) => ({
+            id: m.id,
+            role: m.role,
+            text: m.content,
+          })));
+        }
+      }
+
+      setHydrated(true);
+    }
+    loadProfile();
+  }, []);
+
+  const completeIntake = useCallback((p: UserProfile) => {
+    setUserProfile(p);
+    setShowIntake(false);
+    saveProfileToStorage(p);
+    saveProfileToSupabase(p); // fire-and-forget — session still works if this fails
+  }, []);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const plusRef = useRef<HTMLDivElement>(null);
+
+  // Close the + menu when clicking anywhere outside it.
+  useEffect(() => {
+    if (!plusOpen) return;
+    const onDown = (e: MouseEvent) => {
+      if (plusRef.current && !plusRef.current.contains(e.target as Node)) {
+        setPlusOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, [plusOpen]);
 
   const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -245,40 +365,176 @@ export default function CuratorPage() {
     scrollToBottom();
   }, [messages, scrollToBottom]);
 
-  const handleImageUpload = useCallback(
+  // Focus the composer the moment the chat opens, so a caret blinks immediately
+  // — a small signal that the curator is live and ready to receive.
+  useEffect(() => {
+    if (showIntake) return;
+    const t = setTimeout(() => textareaRef.current?.focus(), 60);
+    return () => clearTimeout(t);
+  }, [showIntake]);
+
+  const handleFilesSelected = useCallback(
     async (e: React.ChangeEvent<HTMLInputElement>) => {
-      const files = Array.from(e.target.files ?? []);
+      let files = Array.from(e.target.files ?? []);
       if (!files.length) return;
 
+      const isFolderUpload = files.some((f) => !!f.webkitRelativePath);
+
+      // Allowlist only — anything not explicitly known-safe is rejected.
+      // Matched on BOTH mime and extension so a spoofed type can't sneak through.
+      // SVG is excluded deliberately: it can carry script/XSS and isn't needed.
+      const isImage = (f: File) =>
+        f.type.startsWith("image/") &&
+        f.type !== "image/svg+xml" &&
+        /\.(jpe?g|png|gif|webp|bmp|avif|heic|heif|tiff?)$/i.test(f.name);
+      const isPdf = (f: File) =>
+        (f.type === "application/pdf" || f.type === "") && /\.pdf$/i.test(f.name);
+      const isText = (f: File) =>
+        (f.type.startsWith("text/") || f.type === "") && /\.(txt|md|csv)$/i.test(f.name);
+      const isSupported = (f: File) => isImage(f) || isPdf(f) || isText(f);
+      const overSized = (f: File) =>
+        (isImage(f) && f.size > MAX_IMAGE_BYTES) ||
+        (isPdf(f) && f.size > MAX_PDF_BYTES) ||
+        (isText(f) && f.size > MAX_TEXT_BYTES);
+      const baseName = (f: File) => (f.webkitRelativePath || f.name).split("/").pop() || f.name;
+      const isIgnorable = (f: File) => {
+        const n = baseName(f);
+        return n.startsWith(".") || /^(Thumbs\.db|desktop\.ini)$/i.test(n);
+      };
+      const readBase64 = (f: File) =>
+        new Promise<string>((res, rej) => {
+          const r = new FileReader();
+          r.onload = () => res((r.result as string).split(",")[1]);
+          r.onerror = rej;
+          r.readAsDataURL(f);
+        });
+
+      const reset = () => {
+        if (fileInputRef.current) fileInputRef.current.value = "";
+      };
+
+      // Drop system/hidden files (e.g. .DS_Store) so they don't fail a folder.
+      files = files.filter((f) => !isIgnorable(f));
+      if (!files.length) {
+        reset();
+        return;
+      }
+
+      // A folder is all-or-nothing: reject the whole folder if it is too large,
+      // or holds anything we can't safely read (a Word doc, an executable,
+      // an archive, an oversized file, …).
+      if (isFolderUpload) {
+        if (files.length > MAX_FILES_PER_ADD) {
+          setFileNotice(`Folder not added — too many files (max ${MAX_FILES_PER_ADD})`);
+          reset();
+          return;
+        }
+        const bad = files.find((f) => !isSupported(f));
+        if (bad) {
+          setFileNotice(`Folder not added — ${baseName(bad)} cannot be read. Only images, PDFs, and text files are allowed`);
+          reset();
+          return;
+        }
+        const big = files.find((f) => overSized(f));
+        if (big) {
+          setFileNotice(`Folder not added — ${baseName(big)} is too large`);
+          reset();
+          return;
+        }
+      } else if (files.length > MAX_FILES_PER_ADD) {
+        files = files.slice(0, MAX_FILES_PER_ADD);
+        setFileNotice(`Only the first ${MAX_FILES_PER_ADD} files were added`);
+      }
+
+      const skipped: string[] = [];
+      const tooBig: string[] = [];
       for (const file of files) {
-        if (!file.type.startsWith("image/")) continue;
         try {
-          const processed = await processImage(file);
-          setPendingImages((prev) => [...prev, processed]);
+          if (!isSupported(file)) {
+            skipped.push(baseName(file));
+            continue;
+          }
+          if (overSized(file)) {
+            tooBig.push(baseName(file));
+            continue;
+          }
+          if (isImage(file)) {
+            // processImage decodes the pixels and re-encodes to JPEG via canvas,
+            // which also strips any metadata/embedded payload. A non-image that
+            // slipped past the allowlist fails to decode and is caught below.
+            const processed = await processImage(file);
+            setPendingImages((prev) =>
+              prev.length >= MAX_ATTACHMENTS ? prev : [...prev, processed]
+            );
+          } else if (isPdf(file)) {
+            const data = await readBase64(file);
+            setPendingDocs((prev) =>
+              prev.length >= MAX_ATTACHMENTS
+                ? prev
+                : [...prev, { name: baseName(file), mediaType: "application/pdf", data }]
+            );
+          } else if (isText(file)) {
+            const data = await file.text();
+            setPendingDocs((prev) =>
+              prev.length >= MAX_ATTACHMENTS
+                ? prev
+                : [...prev, { name: baseName(file), mediaType: "text/plain", data }]
+            );
+          }
         } catch {
-          console.error("Failed to process image");
+          skipped.push(baseName(file));
         }
       }
 
-      if (fileInputRef.current) fileInputRef.current.value = "";
+      if (tooBig.length) {
+        setFileNotice(`${tooBig[0]} is too large`);
+      } else if (skipped.length) {
+        setFileNotice(`${skipped.join(", ")} cannot be read. Only .pdf documents are supported`);
+      }
+
+      reset();
     },
     []
   );
+
+  // Auto-dismiss the unsupported-file notice.
+  useEffect(() => {
+    if (!fileNotice) return;
+    const t = setTimeout(() => setFileNotice(null), 6000);
+    return () => clearTimeout(t);
+  }, [fileNotice]);
 
   const removeImage = useCallback((index: number) => {
     setPendingImages((prev) => prev.filter((_, i) => i !== index));
   }, []);
 
+  const removeDoc = useCallback((index: number) => {
+    setPendingDocs((prev) => prev.filter((_, i) => i !== index));
+  }, []);
+
+  // Open the hidden file input configured for the chosen source.
+  const openPicker = useCallback((opts: { accept?: string; directory?: boolean }) => {
+    const el = fileInputRef.current;
+    if (!el) return;
+    el.accept = opts.accept ?? "";
+    if (opts.directory) el.setAttribute("webkitdirectory", "");
+    else el.removeAttribute("webkitdirectory");
+    el.value = "";
+    el.click();
+    setPlusOpen(false);
+  }, []);
+
   const handleSubmit = useCallback(async () => {
     if (isLoading) return;
     const text = input.trim();
-    if (!text && !pendingImages.length) return;
+    if (!text && !pendingImages.length && !pendingDocs.length) return;
 
     const userMessage: DisplayMessage = {
       id: crypto.randomUUID(),
       role: "user",
       text,
       images: pendingImages.length ? [...pendingImages] : undefined,
+      docs: pendingDocs.length ? [...pendingDocs] : undefined,
     };
 
     const assistantMessage: DisplayMessage = {
@@ -292,7 +548,28 @@ export default function CuratorPage() {
     setMessages([...newMessages, assistantMessage]);
     setInput("");
     setPendingImages([]);
+    setPendingDocs([]);
     setIsLoading(true);
+
+    // Create or reuse a conversation for signed-in users
+    let activeConversationId = conversationId;
+    if (!activeConversationId) {
+      const title = text.slice(0, 60) || "New conversation";
+      const newId = await createConversation(title);
+      if (newId) {
+        activeConversationId = newId;
+        setConversationId(newId);
+        setConversations((prev) => [
+          { id: newId, title, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+          ...prev,
+        ]);
+      }
+    }
+
+    // Save user message
+    if (activeConversationId && text) {
+      saveMessage(activeConversationId, "user", text);
+    }
 
     try {
       const apiMessages = buildApiMessages(newMessages);
@@ -302,9 +579,28 @@ export default function CuratorPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           messages: apiMessages,
-          profile: userProfile ? buildProfileDescription(userProfile) : "",
+          profile: [
+            userProfile ? buildProfileDescription(userProfile) : "",
+            buildNotesDescription(aiNotes),
+            clientName ? `The client's name is ${clientName}. They are a known client — greet them by name on the first message and do not introduce yourself.` : "",
+          ]
+            .filter(Boolean)
+            .join("\n\n"),
         }),
       });
+
+      if (response.status === 429) {
+        setMessages((prev) => {
+          const updated = [...prev];
+          updated[updated.length - 1] = {
+            ...updated[updated.length - 1],
+            text: "You're moving a little quickly — give me a moment, then try again.",
+            isStreaming: false,
+          };
+          return updated;
+        });
+        return;
+      }
 
       if (!response.ok) throw new Error("API error");
 
@@ -327,7 +623,7 @@ export default function CuratorPage() {
         });
       }
 
-      // Mark streaming as done
+      // Mark streaming as done and save assistant message
       setMessages((prev) => {
         const updated = [...prev];
         updated[updated.length - 1] = {
@@ -336,6 +632,28 @@ export default function CuratorPage() {
         };
         return updated;
       });
+      if (activeConversationId && streamedText) {
+        saveMessage(activeConversationId, "assistant", streamedText);
+
+        // Generate a proper title after the first exchange
+        if (messages.length === 0 && text) {
+          fetch("/api/conversation-title", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ message: text }),
+          })
+            .then((r) => r.json())
+            .then(({ title }) => {
+              if (title && activeConversationId) {
+                updateConversationTitle(activeConversationId, title);
+                setConversations((prev) =>
+                  prev.map((c) => c.id === activeConversationId ? { ...c, title } : c)
+                );
+              }
+            })
+            .catch(() => {});
+        }
+      }
     } catch {
       setMessages((prev) => {
         const updated = [...prev];
@@ -350,7 +668,7 @@ export default function CuratorPage() {
       setIsLoading(false);
       textareaRef.current?.focus();
     }
-  }, [input, pendingImages, messages, isLoading, userProfile]);
+  }, [input, pendingImages, pendingDocs, messages, isLoading, userProfile, aiNotes, clientName, conversationId]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -375,58 +693,251 @@ export default function CuratorPage() {
 
   return (
     <div
-      className="flex flex-col h-screen"
-      style={{ background: "#080705" }}
+      className="flex flex-col h-screen relative"
     >
-      {/* Profile intake overlay */}
-      {showIntake && (
-        <ProfileIntake
-          onComplete={(p) => {
-            setUserProfile(p);
-            setShowIntake(false);
+      {/* Transcript background — the Ordre stationery card (swan letterhead at top,
+          framed parchment), shown crisp behind the conversation. */}
+      <div aria-hidden style={{
+        position: "fixed",
+        inset: 0,
+        backgroundColor: "rgb(245,240,232)",
+        backgroundImage: "url('/backgroundchat.png')",
+        backgroundSize: "cover",
+        backgroundPosition: "center top",
+        backgroundRepeat: "no-repeat",
+        pointerEvents: "none",
+        zIndex: 0,
+      }} />
+
+      {/* Profile intake overlay — held back until storage is checked so a
+          returning client never flashes the intake before it's skipped. */}
+      {hydrated && showIntake && <ProfileIntake onComplete={completeIntake} />}
+
+      {/* History panel */}
+      {showHistory && (
+        <div
+          onClick={() => setShowHistory(false)}
+          style={{
+            position: "fixed", inset: 0, zIndex: 80,
+            background: "rgba(18,12,6,0.45)",
+            backdropFilter: "blur(4px)",
+            animation: "fadeInOverlay 0.2s ease both",
           }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              position: "absolute", top: 0, right: 0, bottom: 0,
+              width: "min(320px, 88vw)",
+              background: "rgb(245,240,232)",
+              backgroundImage: "url('/backgroundchat.png')",
+              backgroundSize: "cover",
+              overflowY: "auto",
+              padding: "2rem 1.5rem",
+              display: "flex",
+              flexDirection: "column",
+              gap: "0.5rem",
+            }}
+          >
+            <p style={{
+              fontFamily: "var(--font-jost)",
+              fontSize: "0.5rem",
+              letterSpacing: "0.28em",
+              textTransform: "uppercase",
+              color: "rgba(26,18,10,0.4)",
+              marginBottom: "1rem",
+            }}>
+              Past Conversations
+            </p>
+            {conversations.map((c) => (
+              <button
+                key={c.id}
+                onClick={async () => {
+                  const msgs = await loadConversationMessages(c.id);
+                  setMessages(msgs.map((m) => ({ id: m.id, role: m.role, text: m.content })));
+                  setConversationId(c.id);
+                  setShowHistory(false);
+                }}
+                style={{
+                  background: c.id === conversationId ? "rgba(26,18,10,0.06)" : "none",
+                  border: "none",
+                  borderBottom: "1px solid rgba(26,18,10,0.08)",
+                  padding: "0.75rem 0.5rem",
+                  textAlign: "left",
+                  fontFamily: "var(--font-cormorant)",
+                  fontSize: "0.95rem",
+                  fontStyle: "italic",
+                  color: "rgba(26,18,10,0.75)",
+                  width: "100%",
+                  transition: "background 0.15s ease",
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(26,18,10,0.06)"; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = c.id === conversationId ? "rgba(26,18,10,0.06)" : "none"; }}
+              >
+                {c.title}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Profile overlay — account gate + curated profile with stylist notes */}
+      {showProfile && (
+        <ProfilePanel
+          userProfile={userProfile}
+          onClose={() => setShowProfile(false)}
+          onRefineAesthetic={() => {
+            setShowProfile(false);
+            setShowIntake(true);
+          }}
+          onNotesChange={setAiNotes}
         />
       )}
 
-      {/* Header */}
+      {/* Header — hidden during intake */}
       <header
-        className="flex-shrink-0 flex items-center justify-between px-6 md:px-10 py-4"
+        className="flex-shrink-0 flex items-center justify-end px-6 md:px-10 py-4"
         style={{
-          borderBottom: "1px solid rgba(201,168,76,0.12)",
-          background: "rgba(8,7,5,0.95)",
-          backdropFilter: "blur(20px)",
+          display: showIntake ? "none" : undefined,
+          position: "relative",
+          zIndex: 1,
         }}
       >
-        <Link href="/" className="group flex items-center gap-3">
-          <span className="font-serif text-xl text-cream transition-colors duration-300 group-hover:text-gold-light">
-            Ordre.
-          </span>
+        <Link
+          href="/"
+          className="group flex items-center"
+          style={{ position: "absolute", left: "50%", transform: "translateX(-50%)" }}
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/webfont3e.png"
+            alt="ORDRE"
+            style={{ height: "15px", width: "auto", display: "block" }}
+          />
         </Link>
 
-        <div className="flex items-center gap-2">
-          <div
-            className="w-1.5 h-1.5 rounded-full bg-gold opacity-60"
-            style={{ animation: isLoading ? "none" : undefined }}
-          />
-          <span className="font-sans text-[10px] tracking-widest uppercase text-cream-muted opacity-50">
-            {isLoading ? "Curating" : "Active"}
-          </span>
+        <div className="flex items-center gap-5">
+          {/* New conversation */}
+          {messages.length > 0 && (
+            <button
+              onClick={() => { setMessages([]); setConversationId(null); }}
+              style={{
+                fontFamily: "var(--font-jost)",
+                fontSize: "0.5rem",
+                letterSpacing: "0.24em",
+                textTransform: "uppercase",
+                color: "rgba(26,18,10,0.45)",
+                background: "none",
+                border: "none",
+                paddingBottom: "1px",
+                borderBottom: "1px solid rgba(26,18,10,0.18)",
+                transition: "color 0.2s ease, border-color 0.2s ease",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.color = "rgba(26,18,10,0.8)";
+                e.currentTarget.style.borderBottomColor = "rgba(26,18,10,0.4)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.color = "rgba(26,18,10,0.45)";
+                e.currentTarget.style.borderBottomColor = "rgba(26,18,10,0.18)";
+              }}
+            >
+              New
+            </button>
+          )}
+
+          {/* History */}
+          {conversations.length > 0 && (
+            <button
+              onClick={() => setShowHistory((v) => !v)}
+              style={{
+                fontFamily: "var(--font-jost)",
+                fontSize: "0.5rem",
+                letterSpacing: "0.24em",
+                textTransform: "uppercase",
+                color: "rgba(26,18,10,0.45)",
+                background: "none",
+                border: "none",
+                paddingBottom: "1px",
+                borderBottom: "1px solid rgba(26,18,10,0.18)",
+                transition: "color 0.2s ease, border-color 0.2s ease",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.color = "rgba(26,18,10,0.8)";
+                e.currentTarget.style.borderBottomColor = "rgba(26,18,10,0.4)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.color = "rgba(26,18,10,0.45)";
+                e.currentTarget.style.borderBottomColor = "rgba(26,18,10,0.18)";
+              }}
+            >
+              History
+            </button>
+          )}
+
+          {/* Profile — opens the client's profile (account + stylist notes) */}
+          <button
+            onClick={() => setShowProfile(true)}
+            style={{
+              fontFamily: "var(--font-jost)",
+              fontSize: "0.5rem",
+              letterSpacing: "0.24em",
+              textTransform: "uppercase",
+              color: "rgba(26,18,10,0.45)",
+              background: "none",
+              border: "none",
+              paddingBottom: "1px",
+              borderBottom: "1px solid rgba(26,18,10,0.18)",
+              transition: "color 0.2s ease, border-color 0.2s ease",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.color = "rgba(26,18,10,0.8)";
+              e.currentTarget.style.borderBottomColor = "rgba(26,18,10,0.4)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.color = "rgba(26,18,10,0.45)";
+              e.currentTarget.style.borderBottomColor = "rgba(26,18,10,0.18)";
+            }}
+          >
+            Profile
+          </button>
+
+          {/* Data & privacy — reach the erasure control from inside the app */}
+          <Link
+            href="/privacy"
+            style={{
+              fontFamily: "var(--font-jost)",
+              fontSize: "0.5rem",
+              letterSpacing: "0.24em",
+              textTransform: "uppercase",
+              color: "rgba(26,18,10,0.45)",
+              textDecoration: "none",
+              paddingBottom: "1px",
+              borderBottom: "1px solid rgba(26,18,10,0.18)",
+              transition: "color 0.2s ease, border-color 0.2s ease",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.color = "rgba(26,18,10,0.8)";
+              e.currentTarget.style.borderBottomColor = "rgba(26,18,10,0.4)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.color = "rgba(26,18,10,0.45)";
+              e.currentTarget.style.borderBottomColor = "rgba(26,18,10,0.18)";
+            }}
+          >
+            Privacy
+          </Link>
         </div>
       </header>
 
-      {/* Messages area */}
-      <div className="flex-1 overflow-y-auto">
+      {/* Messages area — hidden during intake */}
+      <div className="flex-1 overflow-y-auto" style={{ visibility: showIntake ? "hidden" : "visible", position: "relative", zIndex: 1 }}>
         {messages.length === 0 ? (
           <EmptyState />
         ) : (
           <div className="py-6">
-            {messages.map((msg, index) => (
+            {messages.map((msg) => (
               <div key={msg.id}>
-                {index > 0 &&
-                  msg.role === "user" &&
-                  messages[index - 1].role === "assistant" && (
-                    <OrnamentDivider />
-                  )}
                 {msg.role === "assistant" ? (
                   <AssistantMessage message={msg} />
                 ) : (
@@ -439,15 +950,48 @@ export default function CuratorPage() {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Input area */}
+      {/* Input area — hidden during intake */}
       <div
         className="flex-shrink-0"
         style={{
-          borderTop: "1px solid rgba(201,168,76,0.12)",
-          background: "rgba(8,7,5,0.98)",
-          backdropFilter: "blur(20px)",
+          display: showIntake ? "none" : undefined,
+          position: "relative",
+          zIndex: 1,
         }}
       >
+        {/* Unsupported-file hint */}
+        {fileNotice && (
+          <div className="px-6 md:px-10 pt-3 pb-0">
+            <div
+              className="flex items-start gap-2"
+              style={{
+                maxWidth: 460,
+                padding: "8px 12px",
+                borderRadius: "10px",
+                background: "rgba(120,80,30,0.06)",
+                border: "1px solid rgba(120,80,30,0.16)",
+              }}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="rgba(120,80,30,0.65)" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginTop: 1 }}>
+                <circle cx="12" cy="12" r="10" />
+                <line x1="12" y1="8" x2="12" y2="12" />
+                <line x1="12" y1="16" x2="12.01" y2="16" />
+              </svg>
+              <span style={{ fontFamily: "var(--font-inter)", fontSize: "12.5px", lineHeight: 1.5, color: "rgba(26,18,10,0.7)" }}>
+                {fileNotice}
+              </span>
+              <button
+                onClick={() => setFileNotice(null)}
+                className="flex-shrink-0"
+                style={{ color: "rgba(26,18,10,0.4)", fontSize: "12px", lineHeight: 1, padding: "0 2px", marginLeft: "auto" }}
+                title="Dismiss"
+              >
+                ✕
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Image previews */}
         {pendingImages.length > 0 && (
           <div
@@ -480,155 +1024,218 @@ export default function CuratorPage() {
           </div>
         )}
 
-        <div className="flex items-end gap-3 px-6 md:px-10 py-4">
-          {/* Image upload — Art Nouveau square button */}
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4, minWidth: "max-content" }}>
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            disabled={isLoading}
-            className="flex-shrink-0 flex items-center justify-center transition-all duration-300 disabled:opacity-30 group"
-            style={{
-              width: 38,
-              height: 38,
-              border: "1px solid rgba(201,168,76,0.15)",
-              background: "rgba(201,168,76,0.02)",
-            }}
-            title="Attach image"
-          >
-            <svg width="32" height="32" viewBox="0 0 40 40" fill="none"
-              stroke="rgba(201,168,76,0.75)" strokeWidth="0.42" strokeLinecap="round"
-              className="group-hover:stroke-[rgba(201,168,76,1)] transition-all duration-300"
-            >
-              {/* Outer border ring */}
-              <circle cx="20" cy="20" r="18.5" />
-
-              {/* Cusped Gothic scallop border — 16 sharp cusps */}
-              {(() => {
-                const n = 16, Ro = 17, Ri = 14.8;
-                const pts: string[] = [];
-                for (let i = 0; i <= n; i++) {
-                  const ap = 2 * Math.PI * i / n;
-                  const am = 2 * Math.PI * (i + 0.5) / n;
-                  const xp = 20 + Ro * Math.cos(ap), yp = 20 + Ro * Math.sin(ap);
-                  const xm = 20 + Ri * Math.cos(am), ym = 20 + Ri * Math.sin(am);
-                  if (i === 0) pts.push(`M${xp.toFixed(2)} ${yp.toFixed(2)}`);
-                  else pts.push(`L${xp.toFixed(2)} ${yp.toFixed(2)}`);
-                  if (i < n) pts.push(`L${xm.toFixed(2)} ${ym.toFixed(2)}`);
-                }
-                return <path d={pts.join(' ')} strokeOpacity="0.38" />;
-              })()}
-
-              {/* 12 primary Gothic lancets — pointed-arch Bézier curves */}
-              {[0,30,60,90,120,150,180,210,240,270,300,330].map(deg => (
-                <path key={deg}
-                  d="M -1.15 5.5 C -2.4 0.5 -0.65 -12.4 0 -13.2 C 0.65 -12.4 2.4 0.5 1.15 5.5"
-                  transform={`translate(20 20) rotate(${deg + 90})`}
-                  strokeOpacity="0.7"
-                />
-              ))}
-
-              {/* 12 secondary lancets at 15° offset — shorter, more delicate */}
-              {[15,45,75,105,135,165,195,225,255,285,315,345].map(deg => (
-                <path key={deg}
-                  d="M -0.72 8.2 C -1.5 4.2 -0.38 -6.8 0 -7.6 C 0.38 -6.8 1.5 4.2 0.72 8.2"
-                  transform={`translate(20 20) rotate(${deg + 90})`}
-                  strokeOpacity="0.28"
-                />
-              ))}
-
-              {/* Inner tracery ring */}
-              <circle cx="20" cy="20" r="5.2" strokeOpacity="0.25" />
-
-              {/* Central 6-petal rosette — tiny lancets */}
-              {[0,60,120,180,240,300].map(deg => (
-                <path key={deg}
-                  d="M -0.52 1.35 C -1.05 0.35 -0.28 -2.4 0 -2.7 C 0.28 -2.4 1.05 0.35 0.52 1.35"
-                  transform={`translate(20 20) rotate(${deg + 90})`}
-                  strokeOpacity="0.9"
-                />
-              ))}
-
-              {/* Oculus */}
-              <circle cx="20" cy="20" r="0.65" />
-            </svg>
-          </button>
-          <span style={{
-            display: "block",
-            fontFamily: "var(--font-jost)",
-            fontSize: "0.45rem",
-            letterSpacing: "0.2em",
-            textTransform: "uppercase",
-            color: "rgba(201,168,76,0.4)",
-            whiteSpace: "nowrap",
-            textAlign: "center",
-          }}>add image</span>
+        {/* Document chips */}
+        {pendingDocs.length > 0 && (
+          <div className="flex gap-2 px-6 md:px-10 pt-3 pb-0 flex-wrap">
+            {pendingDocs.map((doc, i) => (
+              <div
+                key={i}
+                className="flex items-center gap-2"
+                style={{
+                  maxWidth: 220,
+                  padding: "6px 10px",
+                  borderRadius: "10px",
+                  background: "rgba(248,243,234,0.7)",
+                  border: "1px solid rgba(26,18,10,0.12)",
+                }}
+              >
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="rgba(26,18,10,0.55)" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                  <polyline points="14 2 14 8 20 8" />
+                </svg>
+                <span
+                  className="truncate"
+                  style={{ fontFamily: "var(--font-inter)", fontSize: "12.5px", color: "rgba(26,18,10,0.8)" }}
+                  title={doc.name}
+                >
+                  {doc.name}
+                </span>
+                <button
+                  onClick={() => removeDoc(i)}
+                  className="flex-shrink-0"
+                  style={{ color: "rgba(26,18,10,0.4)", fontSize: "12px", lineHeight: 1, padding: "0 2px" }}
+                  title="Remove"
+                >
+                  ✕
+                </button>
+              </div>
+            ))}
           </div>
+        )}
+
+        <div className="px-6 md:px-10 py-4">
           <input
             ref={fileInputRef}
             type="file"
             accept="image/*"
             multiple
             className="hidden"
-            onChange={handleImageUpload}
+            onChange={handleFilesSelected}
           />
 
-          {/* Text input */}
-          <textarea
-            ref={textareaRef}
-            value={input}
-            onChange={handleTextareaInput}
-            onKeyDown={handleKeyDown}
-            placeholder="Describe your vision, or share an image…"
-            disabled={isLoading}
-            rows={1}
-            className="flex-1 bg-transparent font-sans font-light text-sm text-cream placeholder:text-cream-muted placeholder:opacity-30 disabled:opacity-40 py-2"
+          {/* Composer — a writing card: warm parchment with a fine ink border,
+              rather than a glassy tech bubble. */}
+          <div
+            className="flex flex-col"
             style={{
-              minHeight: "36px",
-              maxHeight: "160px",
-              lineHeight: "1.6",
-              caretColor: "#c9a84c",
-            }}
-          />
-
-          {/* Send button */}
-          <button
-            onClick={handleSubmit}
-            disabled={isLoading || (!input.trim() && !pendingImages.length)}
-            className="flex-shrink-0 flex items-center justify-center w-9 h-9 transition-all duration-300 disabled:opacity-20 group"
-            style={{
-              border: "1px solid rgba(201,168,76,0.35)",
-              background:
-                isLoading || (!input.trim() && !pendingImages.length)
-                  ? "transparent"
-                  : "rgba(201,168,76,0.08)",
+              borderRadius: "13px",
+              padding: "16px 17px 11px",
+              background: "rgba(244,237,224,0.95)",
+              border: "1px solid rgba(26,18,10,0.22)",
+              boxShadow: "0 6px 20px -14px rgba(40,28,12,0.28), inset 0 0 0 3px rgba(244,237,224,1), inset 0 0 0 4px rgba(120,85,40,0.13)",
             }}
           >
-            {isLoading ? (
-              <span
-                className="block w-3 h-3 border border-gold-dim border-t-gold rounded-full"
-                style={{ animation: "spin 0.8s linear infinite" }}
-              />
-            ) : (
-              <svg
-                width="13"
-                height="13"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="rgba(201,168,76,0.7)"
-                strokeWidth="1.5"
-                className="transition-colors duration-200 group-hover:stroke-gold"
-              >
-                <line x1="5" y1="12" x2="19" y2="12" />
-                <polyline points="12 5 19 12 12 19" />
-              </svg>
-            )}
-          </button>
+            {/* Text input — full width, top */}
+            <textarea
+              id="composer"
+              ref={textareaRef}
+              value={input}
+              onChange={handleTextareaInput}
+              onKeyDown={handleKeyDown}
+              placeholder={messages.length === 0 ? "Describe your vision, or share an image…" : ""}
+              disabled={isLoading}
+              rows={1}
+              className="w-full bg-transparent text-[15px] disabled:opacity-40"
+              style={{
+                minHeight: "28px",
+                maxHeight: "200px",
+                lineHeight: "1.6",
+                caretColor: "#1A120A",
+                color: "#1A120A",
+                fontFamily: "var(--font-inter)",
+                resize: "none",
+                outline: "none",
+                padding: "2px 4px 0",
+              }}
+            />
+
+            {/* Thin writing line — a soft sepia baseline the text rests on */}
+            <div style={{ height: "1px", background: "rgba(120,85,40,0.22)", margin: "9px 2px 0" }} />
+
+            {/* Controls row */}
+            <div className="flex items-center justify-between" style={{ marginTop: "10px" }}>
+              {/* Attach menu (+) */}
+              <div className="relative" ref={plusRef}>
+                {plusOpen && (
+                  <>
+                    {/* menu — pops upward */}
+                    <div
+                      style={{
+                        position: "absolute",
+                        bottom: "calc(100% + 10px)",
+                        left: 0,
+                        zIndex: 50,
+                        minWidth: 184,
+                        padding: "4px",
+                        borderRadius: "12px",
+                        background: "rgba(250,246,238,0.94)",
+                        backdropFilter: "blur(20px)",
+                        WebkitBackdropFilter: "blur(20px)",
+                        border: "1px solid rgba(26,18,10,0.10)",
+                        boxShadow: "0 18px 44px -16px rgba(40,28,12,0.42)",
+                        animation: "slideUpModal 0.18s ease both",
+                      }}
+                    >
+                      {[
+                        {
+                          label: "Add Photos",
+                          onClick: () => openPicker({ accept: "image/*" }),
+                          icon: <><rect x="3" y="3" width="18" height="18" rx="2" /><circle cx="8.5" cy="8.5" r="1.5" /><path d="M21 15l-5-5L5 21" /></>,
+                        },
+                        {
+                          label: "Add Files",
+                          onClick: () => openPicker({ accept: "application/pdf,text/plain,.pdf,.txt,.md,.csv" }),
+                          icon: <><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /></>,
+                        },
+                        {
+                          label: "Add Folder",
+                          onClick: () => openPicker({ directory: true }),
+                          icon: <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />,
+                        },
+                      ].map((item) => (
+                        <button
+                          key={item.label}
+                          onClick={item.onClick}
+                          className="w-full flex items-center gap-2.5 rounded-md transition-colors"
+                          style={{
+                            padding: "3px 9px",
+                            fontFamily: "var(--font-inter)",
+                            fontSize: "14px",
+                            color: "#1A120A",
+                            background: "transparent",
+                            textAlign: "left",
+                          }}
+                          onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(26,18,10,0.05)")}
+                          onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+                        >
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(26,18,10,0.62)" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                            {item.icon}
+                          </svg>
+                          {item.label}
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
+                <button
+                  onClick={() => setPlusOpen((o) => !o)}
+                  disabled={isLoading}
+                  className="flex-shrink-0 flex items-center justify-center rounded-full transition-all duration-200 disabled:opacity-30"
+                  style={{ width: 34, height: 34, border: "1px solid rgba(26,18,10,0.16)", background: plusOpen ? "rgba(26,18,10,0.06)" : "transparent" }}
+                  title="Add"
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(26,18,10,0.6)" strokeWidth="1.6" strokeLinecap="round" style={{ transform: plusOpen ? "rotate(45deg)" : "none", transition: "transform 0.2s ease" }}>
+                    <line x1="12" y1="5" x2="12" y2="19" />
+                    <line x1="5" y1="12" x2="19" y2="12" />
+                  </svg>
+                </button>
+              </div>
+
+              {/* Send (circular up-arrow) — hidden until there's something to send.
+                  When it appears, the circle + arrow take the app's muted-black
+                  ink, signalling the curator is active and ready. */}
+              {(!!input.trim() || pendingImages.length > 0 || pendingDocs.length > 0 || isLoading) && (
+                <button
+                  onClick={handleSubmit}
+                  disabled={isLoading}
+                  title="Send"
+                  className="flex-shrink-0 flex items-center justify-center rounded-full transition-colors duration-200"
+                  style={{
+                    width: 34,
+                    height: 34,
+                    background: "rgba(26,18,10,0.14)",
+                    border: "1px solid rgba(26,18,10,0.85)",
+                    animation: "fadeInOverlay 0.2s ease both",
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(26,18,10,0.22)")}
+                  onMouseLeave={(e) => (e.currentTarget.style.background = "rgba(26,18,10,0.14)")}
+                >
+                  {isLoading ? (
+                    <span
+                      className="block w-3 h-3 rounded-full"
+                      style={{ border: "1px solid rgba(26,18,10,0.25)", borderTopColor: "rgba(26,18,10,0.85)", animation: "spin 0.8s linear infinite" }}
+                    />
+                  ) : (
+                    <svg
+                      width="15"
+                      height="15"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="rgba(26,18,10,0.85)"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <line x1="12" y1="19" x2="12" y2="5" />
+                      <polyline points="5 12 12 5 19 12" />
+                    </svg>
+                  )}
+                </button>
+              )}
+            </div>
+          </div>
         </div>
 
-        {/* Hint */}
-        <p className="pb-3 px-6 md:px-10 font-sans text-[10px] tracking-wide text-cream-muted opacity-20">
-          Return to send &nbsp;·&nbsp; Shift + Return for new line
-        </p>
       </div>
 
       {/* Spinner keyframe */}
@@ -636,6 +1243,16 @@ export default function CuratorPage() {
         @keyframes spin {
           from { transform: rotate(0deg); }
           to { transform: rotate(360deg); }
+        }
+        /* Prompt matches the empty-state "Describe the aesthetic…" type —
+           the same clean Inter the client reads and writes in. */
+        textarea#composer::placeholder {
+          font-family: var(--font-inter);
+          font-style: normal;
+          font-size: 15px;
+          letter-spacing: 0;
+          color: rgba(26,18,10,0.42);
+          opacity: 1;
         }
       `}</style>
     </div>

@@ -4,9 +4,11 @@ import { useState, useCallback, useEffect } from "react";
 
 export type UserProfile = {
   colors: string[];
+  environments: string[];
   contrast: string; // "low" | "medium" | "high"
   world: string;
   silhouette: string;
+  gender: string; // "womenswear" | "menswear" | "both"
   aesthetic: string[];
 };
 
@@ -19,13 +21,19 @@ export function buildProfileDescription(p: UserProfile): string {
 
   const parts: string[] = [];
 
+  const chosenEnvironments = ENVIRONMENT_SCENES.filter(e => p.environments.includes(e.value));
+  if (chosenEnvironments.length) {
+    parts.push(`environment sensibility: ${chosenEnvironments.map(e => `"${e.label}"`).join(", ")}`);
+  }
+
   if (chosenPalettes.length) {
     const paletteDescriptions = chosenPalettes.map(c => `"${c.label}" (${c.meaning})`).join("; ");
-    parts.push(`colour world: ${paletteDescriptions}`);
+    parts.push(`color world: ${paletteDescriptions}`);
   }
   if (contrastLabel)           parts.push(`natural contrast: ${contrastLabel.toLowerCase()}`);
   if (worldLabel)              parts.push(`aesthetic world: ${worldLabel}`);
   if (silhouetteLabel)         parts.push(`form: ${silhouetteLabel.toLowerCase()}`);
+  if (p.gender)                parts.push(`curation: ${p.gender}`);
   if (aestheticLabels.length)  parts.push(`sensibility: ${aestheticLabels.join(" & ").toLowerCase()}`);
 
   return parts.length
@@ -37,25 +45,48 @@ export function buildProfileDescription(p: UserProfile): string {
 
 const COLOR_PALETTES = [
   { label: "Carmine",        value: "carmine",         colors: ["#9E0031", "#770058", "#600047", "#44001A"], featured: true,  meaning: "this client is drawn to intensity and drama — they want fashion that makes a statement, commands a room and is unafraid of power. Recommend pieces with presence: deep jewel tones, strong silhouettes, garments with theatrical weight" },
-  { label: "Silver Mist",    value: "silver-mist",    colors: ["#FCF7FF", "#C4CAD0", "#878C8F", "#655560"], featured: false, meaning: "this client is chic, modern and trend-aware — they are polished, follow the right references and want to look current. They are somewhat predictable in the best sense: they trust the edit. Recommend well-positioned contemporary pieces, clean lines, and looks that read as effortlessly of-the-moment" },
-  { label: "Indigo & Earth", value: "indigo-earth",   colors: ["#EF946C", "#C4A77D", "#70877F", "#2F2963"], featured: true,  meaning: "this client lives a bohemian, earthy lifestyle — they are drawn to artisan craft, natural materials, global influences and unhurried dressing. Recommend flowing silhouettes, natural fibres, handmade or ethically-sourced pieces, and a palette rooted in earth and landscape" },
-  { label: "Velvet Rose",    value: "velvet-rose",    colors: ["#0F110C", "#9D6381", "#612940", "#FDECEF"], featured: true,  meaning: "this client favours classic style with a dark romantic edge — they are elegant but not conventional, drawn to tradition with a shadow underneath it. Recommend timeless silhouettes in muted, moody tones: dusty rose, black, deep burgundy, and the occasional soft blush for contrast" },
-  { label: "Fête",           value: "fete",            colors: ["#ED254E", "#F9DC5C", "#C2EABD", "#011936"], featured: true,  meaning: "this client has a joyful, playful and uninhibited relationship with fashion — they enjoy bright colour, fun dressing and experiences that feel bubbly and alive. Recommend bold colour-blocking, playful prints, youthful silhouettes and designers who don't take themselves too seriously" },
-  { label: "Understory",     value: "understory",      colors: ["#0D1F22", "#264027", "#6F732F", "#B38A58"], featured: false, meaning: "this client is intellectual and inward-looking — they read widely, think deeply and are entirely indifferent to trends. They dress with quiet intention rather than to be seen. Recommend considered, unfussy pieces in forest tones: deep greens, aged bronze, dark teal. Think independent labels, utilitarian cuts, garments that age well" },
-  { label: "Grande Dame",    value: "grande-dame",    colors: ["#39181D", "#96031A", "#FDC55E", "#BFBFC5"], featured: true,  meaning: "this client lives for glamour — old Hollywood, red carpet moments, vintage Versace and maximalist dressing. They believe more is more. Recommend statement pieces, rich fabrics like velvet and silk, bold jewel tones, gold accents and designers who understand theatre" },
-  { label: "Electric Noir",  value: "electric-noir",  colors: ["#0D0106", "#3626A7", "#657ED4", "#FF331F"], featured: true,  meaning: "this client lives for nightlife, city energy and the electric pulse of somewhere like New York — they are drawn to the 80s: bold shoulders, graphic contrast, neon against black. Recommend high-impact evening pieces, leather, strong colour pops against dark foundations, and designers with an urban or new-wave sensibility" },
+  { label: "Grande Dame",    value: "grande-dame",    colors: ["#39181D", "#96031A", "#FDC55E", "#BFBFC5"], featured: true,  meaning: "this client lives for glamour — old Hollywood, red carpet moments, vintage Versace and maximalist dressing. They believe more is more. Recommend statement pieces, rich fabrics like velvet and silk, bold jewel tones, gold accents and designers who understand theater" },
   { label: "Bare Silk",      value: "bare-silk",      colors: ["#D98877", "#E19D94", "#EEC5AF", "#FCE5D9"], featured: false, meaning: "this client is drawn to quiet luxury and old money sensibility — they wear cashmere, carry nothing logo, and dress with an understated confidence that needs no announcement. Recommend tonal dressing in warm nudes and blush roses, impeccable tailoring, heritage labels and pieces that whisper rather than shout" },
+  { label: "Velvet Rose",    value: "velvet-rose",    colors: ["#0F110C", "#9D6381", "#612940", "#FDECEF"], featured: true,  meaning: "this client favors classic style with a dark romantic edge — they are elegant but not conventional, drawn to tradition with a shadow underneath it. Recommend timeless silhouettes in muted, moody tones: dusty rose, black, deep burgundy, and the occasional soft blush for contrast" },
+  { label: "Indigo & Earth", value: "indigo-earth",   colors: ["#EF946C", "#C4A77D", "#70877F", "#2F2963"], featured: true,  meaning: "this client lives a bohemian, earthy lifestyle — they are drawn to artisan craft, natural materials, global influences and unhurried dressing. Recommend flowing silhouettes, natural fibres, handmade or ethically-sourced pieces, and a palette rooted in earth and landscape" },
+  { label: "Gilded",         value: "gilded",          colors: ["#221408", "#8B5A2B", "#C6A14A", "#ECE1C9"], featured: true,  meaning: "this client is drawn to heritage luxury and old-money warmth — espresso, cognac, antique gold and champagne, the world of Hermès leather, Loro Piana cashmere and gilt. Richly warm tones that flatter deep and olive complexions especially. Recommend impeccable heritage tailoring, supple leather, camel and chocolate, gold rather than silver, and labels that wear their quality without a logo" },
+  { label: "Understory",     value: "understory",      colors: ["#0D1F22", "#264027", "#6F732F", "#B38A58"], featured: false, meaning: "this client is intellectual and inward-looking — they read widely, think deeply and are entirely indifferent to trends. They dress with quiet intention rather than to be seen. Recommend considered, unfussy pieces in forest tones: deep greens, aged bronze, dark teal. Think independent labels, utilitarian cuts, garments that age well" },
+  { label: "Electric Noir",  value: "electric-noir",  colors: ["#0D0106", "#3626A7", "#657ED4", "#FF331F"], featured: true,  meaning: "this client lives for nightlife, city energy and the electric pulse of somewhere like New York — they are drawn to the 80s: bold shoulders, graphic contrast, neon against black. Recommend high-impact evening pieces, leather, strong color pops against dark foundations, and designers with an urban or new-wave sensibility" },
   { label: "Shore & Sail",   value: "shore-sail",     colors: ["#B3001B", "#245894", "#D3E0EE", "#CCAD8F"], featured: true,  meaning: "this client has a coastal, preppy sensibility — think Nantucket, sailing clubs, sun-bleached linen and effortless summer ease. Recommend classic Americana and European resort wear: navy and white stripes, crisp cotton, relaxed tailoring and a palette anchored in sea, sand and faded red" },
+  { label: "Fête",           value: "fete",            colors: ["#ED254E", "#F9DC5C", "#C2EABD", "#011936"], featured: true,  meaning: "this client has a joyful, playful and uninhibited relationship with fashion — they enjoy bright color, fun dressing and experiences that feel bubbly and alive. Recommend bold color-blocking, playful prints, youthful silhouettes and designers who don't take themselves too seriously" },
+  { label: "Ink & Ash",      value: "ink-ash",        colors: ["#FFFFFF", "#B8B8B8", "#45596E", "#0E1620"], featured: true,  meaning: "this client lives in grayscale — a minimalist with a sharp, architectural eye, drawn to contrast, clean lines and the discipline of a monochrome wardrobe. Think Parisian restraint, avant-garde tailoring, the quiet authority of blue-black ink against stark white. Recommend impeccable cuts, graphic silhouettes, blue-black and cool slate, crisp whites and soft grays, and designers who prove the absence of color is its own statement" },
+  { label: "Silver Mist",    value: "silver-mist",    colors: ["#878C8F", "#FCF7FF", "#655560", "#C4CAD0"], featured: false, meaning: "this client is chic, modern and trend-aware — they are polished, follow the right references and want to look current. They are somewhat predictable in the best sense: they trust the edit. Recommend well-positioned contemporary pieces, clean lines, and looks that read as effortlessly of-the-moment" },
+];
+
+// Composite image is 5 columns × 2 rows — background-position crops each scene.
+const ENVIRONMENT_SCENES = [
+  { label: "The Drawing Room",       value: "drawing-room",         col: 0, row: 0, meaning: "candlelit baroque interiors, red velvet and ceremony" },
+  { label: "London Rain",            value: "london-rain",          col: 1, row: 0, meaning: "gray cobblestones, misty mornings, the authority of a great city" },
+  { label: "Desert Nomad",           value: "desert-nomad",         col: 2, row: 0, meaning: "Moroccan tents, palm shadows, sand-worn textiles, the unhurried pace of elsewhere" },
+  { label: "Alpine Retreat",         value: "alpine-retreat",       col: 3, row: 0, meaning: "snow-dusted chalets, pink peaks at dusk, the refined hush of mountain winters" },
+  { label: "Mediterranean Table",    value: "mediterranean-table",  col: 4, row: 0, meaning: "string lights, stone arches, late dinners and the golden ease of the southern coast" },
+  { label: "The Forest Path",        value: "forest-path",          col: 0, row: 1, meaning: "green cathedral light, moss-covered quiet, a world that rewards attention" },
+  { label: "Opening Night",          value: "opening-night",        col: 1, row: 1, meaning: "velvet curtains, footlights, the electric charge of a room built for spectacle" },
+  { label: "Electric City",          value: "electric-city",        col: 2, row: 1, meaning: "purple dusk, palm silhouettes, a skyline that never sleeps" },
+  { label: "The Château",            value: "chateau",              col: 3, row: 1, meaning: "formal gardens, a vintage car on gravel, old money and the confidence it carries" },
+  { label: "Shore & Porch",          value: "shore-porch",          col: 4, row: 1, meaning: "sailboats, hydrangeas, a bicycle by the steps — summer without effort" },
 ];
 
 const WORLD_OPTIONS = [
-  { label: "The Medieval Court", value: "medieval-court",  description: "Guinevere at dusk, velvet sleeves trailing through candlelit halls. The Pre-Raphaelites, McQueen's romantic vision, garments that feel pulled from another time entirely." },
+  { label: "1920s New York",    value: "1920s-new-york",  description: "The Jazz Age — Art Deco glamour, speakeasies and beaded gowns that move. Gatsby's Long Island, Chanel's new freedom, flappers and the first thoroughly modern woman." },
+  { label: "Old Hollywood",     value: "old-hollywood",   description: "The silver screen's golden age — bias-cut satin, marabou and diamonds, a cigarette held just so. Garbo and Dietrich, Adrian's gowns, glamour treated as a complete and deliberate art." },
   { label: "60s Rome",          value: "60s-rome",        description: "La Dolce Vita, Fellini, the early years of Valentino and Pucci. Sensual ease, open-air restaurants, the golden hour stretched indefinitely into evening." },
   { label: "70s California",    value: "70s-california",  description: "Sun-bleached denim, Halston at night, the line between underdressed and iconic impossibly thin. Ease as a form of power." },
-  { label: "80s New York",      value: "80s-new-york",    description: "Power shoulders, graphic contrast, the energy of something about to happen. Mugler, Grace Jones, Studio 54 and the morning after." },
   { label: "80s Tokyo",         value: "80s-tokyo",       description: "Comme des Garçons, Yohji Yamamoto, Issey Miyake arriving in Paris and rewriting the rules. Structural, conceptual, entirely unbothered by Western convention." },
   { label: "90s Minimalism",    value: "90s-minimalism",  description: "Calvin Klein, Helmut Lang, the radical act of wearing almost nothing beautifully. Clean, spare, exact — every piece earned its place." },
-  { label: "The present moment", value: "present",        description: "No nostalgia. The runway right now, the conversation happening today. Forward-facing, trend-literate, alive to what's next." },
+  { label: "Y2K",               value: "y2k",             description: "The turn of the millennium — Tom Ford's Gucci, low-rise denim and logomania, rhinestone gloss and red-carpet shine. Pop excess, dressed to be photographed." },
+  { label: "The Present",        value: "present",        description: "No nostalgia. The runway right now, the conversation happening today. Forward-facing, trend-literate, alive to what's next." },
+];
+
+const GENDER_OPTIONS = [
+  { label: "Womenswear",   value: "womenswear" },
+  { label: "Menswear",     value: "menswear" },
+  { label: "Both",         value: "both" },
 ];
 
 const SILHOUETTE_OPTIONS = [
@@ -84,38 +115,33 @@ const CONTRAST_OPTIONS = [
   {
     value: "low",
     label: "Low Contrast",
-    description: "Your features sit close in tone — skin, hair and eyes share the same quiet register. Tonal dressing and soft colour feel effortless on you.",
-    rectBg: "#D8D0C4",
-    rectText: "#958A7E", // nearly the same as background — barely legible
-    fontWeight: 600,
+    description: "Your features sit close in tone — skin, hair and eyes share the same quiet register. Tonal dressing and soft color feel effortless on you.",
+    // Three tones close in value — the dots themselves read as low contrast.
+    dots: ["#BCA890", "#AE9A82", "#A28E76"],
   },
   {
     value: "medium",
     label: "Medium Contrast",
-    description: "A moderate difference between your features. You move comfortably between muted and bold, and most colour territories work in your favour.",
-    rectBg: "#D8D0C4",
-    rectText: "#6E6156", // mid-tone — comfortably readable
-    fontWeight: 600,
+    description: "A moderate difference between your features. You move comfortably between muted and bold, and most color territories work in your favor.",
+    dots: ["#E6D6BE", "#977B57", "#4A3829"],
   },
   {
     value: "high",
     label: "High Contrast",
-    description: "Strong difference between your skin, hair and eyes — think deep hair against fair skin, or bright eyes against a dark complexion. Bold colour and graphic pattern are your allies.",
-    rectBg: "#D8D0C4",
-    rectText: "#18110A", // near-black — strikingly clear
-    fontWeight: 600,
+    description: "Strong difference between your skin, hair and eyes — think deep hair against fair skin, or bright eyes against a dark complexion. Bold color and graphic pattern are your allies.",
+    dots: ["#F4EBD9", "#876645", "#16100A"],
   },
 ];
 
 /* ─── Shared style tokens ───────────────────────────────────────────────────── */
 const C = {
-  goldBright:  "rgba(201,168,76,1)",
-  goldMid:     "rgba(201,168,76,0.90)",
-  goldDim:     "rgba(201,168,76,0.65)",
-  goldHair:    "rgba(201,168,76,0.38)",
-  textBright:  "#f5e8c4",
-  textMid:     "rgba(235,220,195,0.95)",
-  textDim:     "rgba(225,210,185,0.75)",
+  goldBright:  "rgba(100,65,15,1)",
+  goldMid:     "rgba(100,65,15,0.85)",
+  goldDim:     "rgba(100,65,15,0.60)",
+  goldHair:    "rgba(100,65,15,0.28)",
+  textBright:  "#1A120A",
+  textMid:     "rgba(26,18,10,0.80)",
+  textDim:     "rgba(26,18,10,0.50)",
 };
 
 const labelStyle: React.CSSProperties = {
@@ -154,22 +180,21 @@ function StepColors({ profile, toggle }: { profile: UserProfile; toggle: (v: str
             }}>
               {/* Color strips */}
               <div style={{
-                display: "flex", width: "100%", height: 82,
-                gap: "2px",
+                display: "flex", width: "100%", height: 72,
+                // No divider — swatches sit flush. The color filter lives on
+                // each swatch below (not here).
+                gap: "0px",
                 borderRadius: "4px",
                 overflow: "hidden",
                 opacity: sel ? 1 : 0.82,
-                transition: "opacity 0.25s, box-shadow 0.25s, border-color 0.25s",
-                filter: p.featured ? "saturate(1.6) brightness(1.08)" : "saturate(0.72) brightness(0.88)",
-                border: sel
-                  ? "1.5px solid rgba(201,168,76,0.85)"
-                  : "1.5px solid rgba(201,168,76,0.32)",
+                transition: "opacity 0.25s, box-shadow 0.25s",
+                border: "none",
                 boxShadow: sel
-                  ? "0 0 12px rgba(201,168,76,0.2), 0 4px 20px rgba(0,0,0,0.4)"
+                  ? "0 0 9px rgba(120,105,80,0.16), 0 4px 18px rgba(0,0,0,0.38)"
                   : "0 2px 12px rgba(0,0,0,0.35)",
               }}>
                 {p.colors.map((c, i) => (
-                  <div key={i} style={{ flex: 1, background: c, position: "relative", overflow: "hidden" }}>
+                  <div key={i} style={{ flex: 1, background: c, position: "relative", overflow: "hidden", filter: p.featured ? "saturate(1.6) brightness(1.08)" : "saturate(0.72) brightness(0.88)" }}>
                     {/* Per-swatch grain */}
                     <div aria-hidden style={{
                       position: "absolute", inset: "-60%", width: "220%", height: "220%",
@@ -190,11 +215,11 @@ function StepColors({ profile, toggle }: { profile: UserProfile; toggle: (v: str
                 alignItems: "center",
                 gap: "0.35rem",
               }}>
-                {sel && <span style={{ color: "rgba(201,168,76,0.8)", fontSize: "0.5rem" }}>✦</span>}
+                {sel && <span style={{ color: "rgba(80,52,16,0.9)", fontSize: "0.5rem" }}>✦</span>}
                 <span style={{
                   fontFamily: "var(--font-cormorant)",
-                  fontStyle: "italic",
-                  fontSize: "0.78rem",
+                  fontStyle: "normal",
+                  fontSize: "0.7rem",
                   color: sel ? C.goldBright : C.textMid,
                   transition: "color 0.25s",
                 }}>
@@ -213,7 +238,7 @@ function StepContrast({ profile, setProfile }: { profile: UserProfile; setProfil
   return (
     <>
       <h2 style={{ fontFamily: "var(--font-cormorant)", fontStyle: "italic", fontWeight: 400, fontSize: "clamp(1.55rem, 2.8vw, 2.1rem)", color: C.textBright, marginBottom: "0.4rem" }}>
-        Your natural contrast.
+        Your natural contrast
       </h2>
       <p style={{ ...labelStyle, color: C.textDim, letterSpacing: "0.12em", marginBottom: "2.5rem" }}>
         The relationship between your skin, hair and eyes
@@ -226,30 +251,41 @@ function StepContrast({ profile, setProfile }: { profile: UserProfile; setProfil
               key={opt.value}
               onClick={() => setProfile(p => ({ ...p, contrast: p.contrast === opt.value ? "" : opt.value }))}
               style={{
-                padding: "1rem 1.25rem",
+                display: "flex",
+                flexDirection: "column",
+                gap: "0.5rem",
+                padding: "0.95rem 1.15rem",
                 textAlign: "left",
-                border: sel ? `1px solid ${C.goldMid}` : `1px solid ${C.goldHair}`,
-                background: sel ? "rgba(201,168,76,0.07)" : "transparent",
+                borderRadius: "8px",
+                border: "none",
+                background: sel ? "rgba(201,168,76,0.12)" : "rgba(255,255,255,0.16)",
+                boxShadow: sel
+                  ? "0 3px 16px rgba(40,28,12,0.13)"
+                  : "0 1px 8px rgba(40,28,12,0.05)",
                 cursor: "pointer",
-                transition: "all 0.25s",
+                transition: "background 0.25s, box-shadow 0.25s",
               }}
             >
-              {/* Contrast demonstration rectangle */}
-              <div style={{
-                display: "block",
-                background: opt.rectBg,
-                padding: "0.4rem 1rem 0.4rem 1.6rem",
-                marginBottom: "0.65rem",
-                marginLeft: "-1.25rem",
-                marginRight: "-1.25rem",
-              }}>
+              {/* Title row — three tonal dots visualise the contrast (their own
+                  value spread), beside the upright label. */}
+              <div style={{ display: "flex", alignItems: "center", gap: "0.7rem" }}>
+                <span style={{ display: "inline-flex", gap: "4px", flexShrink: 0 }} aria-hidden>
+                  {opt.dots.map((d, i) => (
+                    <span key={i} style={{
+                      width: 14, height: 14, borderRadius: "50%",
+                      background: d,
+                      boxShadow: "inset 0 0 0 1px rgba(0,0,0,0.07)",
+                    }} />
+                  ))}
+                </span>
                 <span style={{
                   fontFamily: "var(--font-cormorant)",
-                  fontStyle: "italic",
+                  fontStyle: "normal",
+                  fontWeight: 500,
                   fontSize: "1.05rem",
-                  color: opt.rectText,
                   letterSpacing: "0.01em",
-                  fontWeight: ("fontWeight" in opt ? opt.fontWeight : 400) as number,
+                  color: sel ? C.goldBright : C.textBright,
+                  transition: "color 0.25s",
                 }}>
                   {opt.label}
                 </span>
@@ -259,7 +295,7 @@ function StepContrast({ profile, setProfile }: { profile: UserProfile; setProfil
                 fontSize: "0.62rem",
                 letterSpacing: "0.04em",
                 lineHeight: 1.6,
-                color: sel ? "rgba(235,210,155,0.75)" : "rgba(200,185,160,0.5)",
+                color: sel ? "rgba(26,18,10,0.7)" : "rgba(26,18,10,0.45)",
                 transition: "color 0.25s",
               }}>
                 {opt.description}
@@ -279,24 +315,29 @@ function StepWorld({ profile, setProfile }: { profile: UserProfile; setProfile: 
         Which world feels like yours?
       </h2>
       <p style={{ ...labelStyle, color: C.textDim, letterSpacing: "0.12em", marginBottom: "0.5rem" }}>
-        The one you'd inhabit, or already do
+        The place that feels like home
       </p>
-      <div style={{ display: "flex", flexDirection: "column", gap: "0.22rem", width: "100%" }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: "0.45rem", width: "100%", maxHeight: "calc(100vh - 18rem)", overflowY: "auto", paddingRight: "2px" }}>
         {WORLD_OPTIONS.map(w => {
           const sel = profile.world === w.value;
           return (
             <button key={w.value}
               onClick={() => setProfile(p => ({ ...p, world: p.world === w.value ? "" : w.value }))}
               style={{
-                padding: "0.42rem 1rem", textAlign: "left",
-                border: sel ? `1px solid ${C.goldMid}` : `1px solid ${C.goldHair}`,
-                background: sel ? "rgba(201,168,76,0.07)" : "transparent",
-                cursor: "pointer", transition: "all 0.25s",
+                padding: "0.7rem 1.1rem", textAlign: "left",
+                borderRadius: "8px",
+                border: "none",
+                background: sel ? "rgba(201,168,76,0.12)" : "rgba(255,255,255,0.16)",
+                boxShadow: sel
+                  ? "0 3px 16px rgba(40,28,12,0.13)"
+                  : "0 1px 8px rgba(40,28,12,0.05)",
+                cursor: "pointer",
+                transition: "background 0.25s, box-shadow 0.25s",
               }}>
               <div style={{
-                fontFamily: "var(--font-cormorant)", fontStyle: "italic", fontSize: "0.98rem",
-                color: sel ? C.goldBright : C.textMid,
-                marginBottom: "0.12rem",
+                fontFamily: "var(--font-cormorant)", fontStyle: "normal", fontWeight: 500, fontSize: "1rem",
+                color: sel ? C.goldBright : C.textBright,
+                marginBottom: "0.15rem",
                 transition: "color 0.25s",
               }}>
                 {w.label}
@@ -304,7 +345,7 @@ function StepWorld({ profile, setProfile }: { profile: UserProfile; setProfile: 
               <div style={{
                 fontFamily: "var(--font-jost)", fontSize: "0.56rem",
                 letterSpacing: "0.03em", lineHeight: 1.55,
-                color: sel ? "rgba(235,210,155,0.7)" : "rgba(200,185,160,0.45)",
+                color: sel ? "rgba(26,18,10,0.7)" : "rgba(26,18,10,0.45)",
                 transition: "color 0.25s",
               }}>
                 {w.description}
@@ -321,7 +362,7 @@ function StepSilhouette({ profile, setProfile }: { profile: UserProfile; setProf
   return (
     <>
       <h2 style={{ fontFamily: "var(--font-cormorant)", fontStyle: "italic", fontWeight: 400, fontSize: "clamp(1.55rem, 2.8vw, 2.1rem)", color: C.textBright, marginBottom: "0.4rem" }}>
-        Your form.
+        Your form
       </h2>
       <p style={{ ...labelStyle, color: C.textDim, letterSpacing: "0.12em", marginBottom: "2rem" }}>
         Your body, as it moves through the world
@@ -333,16 +374,61 @@ function StepSilhouette({ profile, setProfile }: { profile: UserProfile; setProf
             <button key={s.value} onClick={() => setProfile(p => ({ ...p, silhouette: p.silhouette === s.value ? "" : s.value }))}
               style={{
                 padding: "0.85rem 1.25rem", textAlign: "left",
-                border: sel ? `1px solid ${C.goldMid}` : `1px solid ${C.goldHair}`,
-                background: sel ? "rgba(201,168,76,0.07)" : "transparent",
-                cursor: "pointer", transition: "all 0.25s",
+                borderRadius: "8px",
+                border: "none",
+                background: sel ? "rgba(201,168,76,0.12)" : "rgba(255,255,255,0.16)",
+                boxShadow: sel
+                  ? "0 3px 16px rgba(40,28,12,0.13)"
+                  : "0 1px 8px rgba(40,28,12,0.05)",
+                cursor: "pointer",
+                transition: "background 0.25s, box-shadow 0.25s",
               }}>
               <span style={{
-                fontFamily: "var(--font-cormorant)", fontStyle: "italic", fontSize: "1.05rem",
-                color: sel ? C.goldBright : C.textMid,
+                fontFamily: "var(--font-cormorant)", fontStyle: "normal", fontWeight: 500, fontSize: "1.05rem",
+                color: sel ? C.goldBright : C.textBright,
                 transition: "color 0.25s",
               }}>
                 {s.label}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </>
+  );
+}
+
+function StepGender({ profile, setProfile }: { profile: UserProfile; setProfile: React.Dispatch<React.SetStateAction<UserProfile>> }) {
+  return (
+    <>
+      <h2 style={{ fontFamily: "var(--font-cormorant)", fontStyle: "italic", fontWeight: 400, fontSize: "clamp(1.55rem, 2.8vw, 2.1rem)", color: C.textBright, marginBottom: "0.4rem" }}>
+        Your curation
+      </h2>
+      <p style={{ ...labelStyle, color: C.textDim, letterSpacing: "0.12em", marginBottom: "2rem" }}>
+        Which wardrobe speaks to you
+      </p>
+      <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem", width: "100%" }}>
+        {GENDER_OPTIONS.map(opt => {
+          const sel = profile.gender === opt.value;
+          return (
+            <button
+              key={opt.value}
+              onClick={() => setProfile(p => ({ ...p, gender: p.gender === opt.value ? "" : opt.value }))}
+              style={{
+                display: "flex", flexDirection: "column", gap: 0,
+                padding: "0.85rem 1.25rem", textAlign: "left",
+                borderRadius: "8px", border: "none",
+                background: sel ? "rgba(201,168,76,0.12)" : "rgba(255,255,255,0.16)",
+                boxShadow: sel ? "0 3px 16px rgba(40,28,12,0.13)" : "0 1px 8px rgba(40,28,12,0.05)",
+                cursor: "pointer",
+                transition: "background 0.25s, box-shadow 0.25s",
+              }}
+            >
+              <span style={{
+                fontFamily: "var(--font-cormorant)", fontStyle: "normal", fontWeight: 500, fontSize: "1.05rem",
+                color: sel ? C.goldBright : C.textBright, transition: "color 0.25s",
+              }}>
+                {opt.label}
               </span>
             </button>
           );
@@ -356,13 +442,13 @@ function StepAesthetic({ profile, toggle }: { profile: UserProfile; toggle: (v: 
   return (
     <>
       <h2 style={{ fontFamily: "var(--font-cormorant)", fontStyle: "italic", fontWeight: 400, fontSize: "clamp(1.3rem, 2.4vw, 1.8rem)", color: C.textBright, marginBottom: "0.2rem" }}>
-        Your sensibility.
+        Your sensibility
       </h2>
       <p style={{ ...labelStyle, color: C.textDim, letterSpacing: "0.12em", marginBottom: "0.7rem" }}>
         Select up to two
       </p>
 
-      <div style={{ display: "flex", flexDirection: "column", gap: "0.28rem", width: "100%" }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem", width: "100%" }}>
         {AESTHETIC_OPTIONS.map(a => {
           const sel = profile.aesthetic.includes(a.value);
           const disabled = !sel && profile.aesthetic.length >= 2;
@@ -370,16 +456,20 @@ function StepAesthetic({ profile, toggle }: { profile: UserProfile; toggle: (v: 
             <button key={a.value} onClick={() => toggle(a.value)}
               disabled={disabled}
               style={{
-                padding: "0.52rem 1.25rem", textAlign: "left",
-                border: sel ? `1px solid ${C.goldMid}` : `1px solid ${C.goldHair}`,
-                background: sel ? "rgba(201,168,76,0.07)" : "transparent",
+                padding: "0.6rem 1.25rem", textAlign: "left",
+                borderRadius: "8px",
+                border: "none",
+                background: sel ? "rgba(201,168,76,0.12)" : "rgba(255,255,255,0.16)",
+                boxShadow: sel
+                  ? "0 3px 16px rgba(40,28,12,0.13)"
+                  : "0 1px 8px rgba(40,28,12,0.05)",
                 cursor: disabled ? "default" : "pointer",
                 opacity: disabled ? 0.35 : 1,
-                transition: "all 0.25s",
+                transition: "background 0.25s, box-shadow 0.25s, opacity 0.25s",
               }}>
               <span style={{
-                fontFamily: "var(--font-cormorant)", fontStyle: "italic", fontSize: "1.05rem",
-                color: sel ? C.goldBright : C.textMid,
+                fontFamily: "var(--font-cormorant)", fontStyle: "normal", fontWeight: 500, fontSize: "1.05rem",
+                color: sel ? C.goldBright : C.textBright,
                 transition: "color 0.25s",
               }}>
                 {a.label}
@@ -398,6 +488,7 @@ function StepPortrait({ profile, onReady }: { profile: UserProfile; onReady: () 
   const [portrait, setPortrait] = useState("");
   const [names, setNames]       = useState<string[]>([]);
   const [loading, setLoading]   = useState(true);
+  const [error, setError]       = useState(false);
   const [revealed, setRevealed] = useState(false);
 
   useEffect(() => {
@@ -409,8 +500,8 @@ function StepPortrait({ profile, onReady }: { profile: UserProfile; onReady: () 
     })
       .then(r => r.json())
       .then(d => {
+        if (d.error) { setError(true); setLoading(false); setRevealed(true); onReady(); return; }
         const raw: string = d.summary ?? "";
-        // Split at the "Those who may share" heading
         const headingMatch = raw.search(/those who may share/i);
         if (headingMatch >= 0) {
           setPortrait(raw.slice(0, headingMatch).trim());
@@ -424,12 +515,24 @@ function StepPortrait({ profile, onReady }: { profile: UserProfile; onReady: () 
           setPortrait(raw.trim());
         }
         setLoading(false);
-        // slight delay before signalling the button is ready
         setTimeout(() => { setRevealed(true); onReady(); }, 400);
       })
-      .catch(() => { setLoading(false); setRevealed(true); onReady(); });
+      .catch(() => { setError(true); setLoading(false); setRevealed(true); onReady(); });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  if (error) {
+    return (
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "1rem", minHeight: 220, justifyContent: "center" }}>
+        <p style={{ fontFamily: "var(--font-cormorant)", fontStyle: "italic", fontSize: "1.1rem", color: C.textDim, textAlign: "center" }}>
+          Your portrait could not be drawn at this moment.
+        </p>
+        <p style={{ fontFamily: "var(--font-jost)", fontSize: "0.52rem", letterSpacing: "0.18em", color: C.textDim, opacity: 0.6, textAlign: "center" }}>
+          Please ensure your API key is configured, then try again.
+        </p>
+      </div>
+    );
+  }
 
   if (loading) {
     return (
@@ -437,7 +540,7 @@ function StepPortrait({ profile, onReady }: { profile: UserProfile; onReady: () 
         {/* Spinning rose window medallion */}
         <div style={{ animation: "spin-slow 6s linear infinite", width: 80, height: 80 }}>
           <svg width="80" height="80" viewBox="0 0 40 40" fill="none"
-            stroke="rgba(201,168,76,0.85)" strokeWidth="0.42" strokeLinecap="round">
+            stroke="rgba(100,65,15,0.7)" strokeWidth="0.42" strokeLinecap="round">
             <circle cx="20" cy="20" r="18.5" />
             {(() => {
               const n = 16, Ro = 17, Ri = 14.8;
@@ -500,11 +603,11 @@ function StepPortrait({ profile, onReady }: { profile: UserProfile; onReady: () 
 
       {/* Divider */}
       <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginBottom: "1.5rem" }}>
-        <div style={{ flex: 1, height: 1, background: "linear-gradient(to right, rgba(201,168,76,0.35), transparent)" }} />
+        <div style={{ flex: 1, height: 1, background: "linear-gradient(to right, rgba(110,80,40,0.3), transparent)" }} />
         <span style={{ ...labelStyle, fontSize: "0.48rem", letterSpacing: "0.28em" }}>
           those who may share your sensibility
         </span>
-        <div style={{ flex: 1, height: 1, background: "linear-gradient(to left, rgba(201,168,76,0.35), transparent)" }} />
+        <div style={{ flex: 1, height: 1, background: "linear-gradient(to left, rgba(110,80,40,0.3), transparent)" }} />
       </div>
 
       {/* Names */}
@@ -529,40 +632,43 @@ function StepPortrait({ profile, onReady }: { profile: UserProfile; onReady: () 
 
 const STEP_ATMOSPHERES = [
   // 0 — Palette
-  { bg: "rgb(18,9,2)",    filter: "sepia(0.22) saturate(0.74)", watermark: "PALETTE",  rule: "rgba(201,140,60,0.42)" },
+  { bg: "rgb(245,240,232)", filter: "none", watermark: "PALETTE",       rule: "rgba(110,80,40,0.22)" },
   // 1 — Contrast
-  { bg: "rgb(18,9,2)",    filter: "sepia(0.22) saturate(0.74)", watermark: "TEINTE",   rule: "rgba(201,140,60,0.42)" },
+  { bg: "rgb(245,240,232)", filter: "none", watermark: "TEINTE",        rule: "rgba(110,80,40,0.22)" },
   // 2 — World
-  { bg: "rgb(18,9,2)",    filter: "sepia(0.22) saturate(0.74)", watermark: "MONDE",    rule: "rgba(201,140,60,0.42)" },
+  { bg: "rgb(245,240,232)", filter: "none", watermark: "ÉPOQUE",        rule: "rgba(110,80,40,0.22)" },
   // 3 — Silhouette
-  { bg: "rgb(18,9,2)",    filter: "sepia(0.22) saturate(0.74)", watermark: "FORME",    rule: "rgba(201,140,60,0.42)" },
-  // 4 — Aesthetic
-  { bg: "rgb(18,9,2)",    filter: "sepia(0.22) saturate(0.74)", watermark: "ESPRIT",   rule: "rgba(201,140,60,0.42)" },
-  // 5 — Portrait: richest near-black, gold-cast
-  { bg: "rgb(8,5,2)",     filter: "sepia(0.28) saturate(0.84)", watermark: "PORTRAIT", rule: "rgba(201,168,76,0.48)" },
+  { bg: "rgb(245,240,232)", filter: "none", watermark: "FORME",         rule: "rgba(110,80,40,0.22)" },
+  // 4 — Gender
+  { bg: "rgb(245,240,232)", filter: "none", watermark: "GENRE",         rule: "rgba(110,80,40,0.22)" },
+  // 5 — Aesthetic
+  { bg: "rgb(245,240,232)", filter: "none", watermark: "ESPRIT",        rule: "rgba(110,80,40,0.22)" },
+  // 6 — Portrait
+  { bg: "rgb(245,240,232)", filter: "none", watermark: "PORTRAIT",      rule: "rgba(110,80,40,0.28)" },
 ];
 
 /* ─── Main component ────────────────────────────────────────────────────────── */
 
-const STEP_LABELS = ["palette", "complexion", "world", "form", "sensibility", "portrait"];
+const STEP_LABELS = ["palette", "contrast", "world", "form", "wardrobe", "sensibility", "portrait"];
 
 export default function ProfileIntake({ onComplete }: { onComplete: (p: UserProfile) => void }) {
   const [step, setStep] = useState(0);
   const [visible, setVisible] = useState(true);
   const [portraitReady, setPortraitReady] = useState(false);
   const [profile, setProfile] = useState<UserProfile>({
-    colors: [], contrast: "", world: "", silhouette: "", aesthetic: [],
+    colors: [], environments: [], contrast: "", world: "", silhouette: "", gender: "womenswear", aesthetic: [],
   });
 
-  const IS_PORTRAIT = step === 5;
+  const IS_PORTRAIT = step === 6;
 
   const canAdvance =
     (step === 0 && profile.colors.length > 0) ||
     (step === 1 && !!profile.contrast) ||
     (step === 2 && !!profile.world) ||
     (step === 3 && !!profile.silhouette) ||
-    (step === 4 && profile.aesthetic.length > 0) ||
-    (step === 5 && portraitReady);
+    (step === 4 && !!profile.gender) ||
+    (step === 5 && profile.aesthetic.length > 0) ||
+    (step === 6 && portraitReady);
 
   const advance = () => {
     if (step < STEP_LABELS.length - 1) {
@@ -574,14 +680,6 @@ export default function ProfileIntake({ onComplete }: { onComplete: (p: UserProf
   };
 
   const skip = () => onComplete(profile);
-
-  const clearSelection = () => {
-    if (step === 0) setProfile(p => ({ ...p, colors: [] }));
-    else if (step === 1) setProfile(p => ({ ...p, contrast: "" }));
-    else if (step === 2) setProfile(p => ({ ...p, world: "" }));
-    else if (step === 3) setProfile(p => ({ ...p, silhouette: "" }));
-    else if (step === 4) setProfile(p => ({ ...p, aesthetic: [] }));
-  };
 
   const goBack = () => {
     if (step === 0) return;
@@ -608,51 +706,62 @@ export default function ProfileIntake({ onComplete }: { onComplete: (p: UserProf
   const atm = STEP_ATMOSPHERES[step];
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col items-center justify-center"
-      onClick={clearSelection}
+    <div className={`fixed inset-0 flex flex-col items-center ${IS_PORTRAIT ? "justify-center" : "justify-start"}`}
       style={{
-        background: atm.bg,
-        backdropFilter: "blur(12px)",
-        filter: atm.filter,
-        transition: "background 0.6s ease, filter 0.6s ease",
+        zIndex: 9998,
+        backgroundColor: atm.bg,
+        transition: "background-color 0.6s ease",
+        overflowX: "hidden",
+        overflowY: "auto",
       }}>
 
-      {/* Film grain — coarse layer */}
+      {/* Background. Most steps: the frosted parchment (matches the homepage,
+          blurred like frosted glass). Portrait step: the whiter stationery card,
+          crisp — so the reveal hands off seamlessly into the chat. */}
       <div aria-hidden style={{
-        position: "absolute", inset: "-50%", width: "200%", height: "200%",
-        pointerEvents: "none", zIndex: 0,
-        opacity: 0.38, mixBlendMode: "overlay",
-        animation: "film-grain 0.35s steps(1) infinite",
-        backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='280' height='280'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.68' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='280' height='280' filter='url(%23g)'/%3E%3C/svg%3E")`,
-        backgroundRepeat: "repeat", backgroundSize: "200px 200px",
-      }} />
-      {/* Film grain — fine layer */}
-      <div aria-hidden style={{
-        position: "absolute", inset: "-50%", width: "200%", height: "200%",
-        pointerEvents: "none", zIndex: 0,
-        opacity: 0.26, mixBlendMode: "soft-light",
-        animation: "film-grain 0.55s steps(1) infinite",
-        backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='g2'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.92' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23g2)'/%3E%3C/svg%3E")`,
-        backgroundRepeat: "repeat", backgroundSize: "120px 120px",
+        position: "absolute",
+        inset: 0,
+        backgroundColor: "rgb(245,240,232)",
+        backgroundImage: IS_PORTRAIT ? "url('/backgroundchat.png')" : "url('/paper.png')",
+        backgroundSize: "cover",
+        backgroundPosition: IS_PORTRAIT ? "center top" : "center",
+        filter: IS_PORTRAIT ? "none" : "blur(5px)",
+        pointerEvents: "none",
+        zIndex: 0,
+        transition: "filter 0.6s ease",
       }} />
 
-      {/* Top rule — colour shifts per step */}
+      {/* Top rule — color shifts per step */}
       <div className="absolute top-0 left-0 right-0 h-px"
         style={{ background: `linear-gradient(to right, transparent, ${atm.rule} 20%, ${atm.rule} 80%, transparent)`, transition: "background 0.6s ease" }} />
+
+      {/* Contrast step: the section label sits above the progress dots. */}
+      {!IS_PORTRAIT && step === 1 && (
+        <p className="absolute" style={{
+          ...labelStyle,
+          top: "0.5rem",
+          left: "50%",
+          transform: "translateX(-50%)",
+          margin: 0,
+          zIndex: 1,
+        }}>
+          {STEP_LABELS[1]}
+        </p>
+      )}
 
       {/* Progress bar — hidden on portrait step */}
       {!IS_PORTRAIT && (
         <div className="absolute top-7 flex items-center gap-2">
-          {STEP_LABELS.slice(0, 5).map((_, i) => (
+          {STEP_LABELS.slice(0, 6).map((_, i) => (
             <div key={i} style={{
               height: 2,
               width: i === step ? 28 : 8,
               borderRadius: 2,
               background: i < step
-                ? "rgba(201,168,76,0.55)"
+                ? "rgba(100,65,15,0.45)"
                 : i === step
-                ? "rgba(201,168,76,0.9)"
-                : "rgba(201,168,76,0.15)",
+                ? "rgba(100,65,15,0.85)"
+                : "rgba(100,65,15,0.12)",
               transition: "all 0.4s ease",
             }} />
           ))}
@@ -660,62 +769,66 @@ export default function ProfileIntake({ onComplete }: { onComplete: (p: UserProf
       )}
 
       {/* Content */}
-      <div className="flex flex-col items-center px-8 w-full" onClick={e => e.stopPropagation()}
+      <div className="flex flex-col items-center px-8 w-full"
         style={{
+          position: "relative",
+          zIndex: 1,
           maxWidth: IS_PORTRAIT ? 560 : 480,
-          paddingTop: step === 0 ? "2.25rem" : step === 2 ? "2rem" : step === 4 ? "2.5rem" : "4rem",
-          paddingBottom: step === 0 ? "0.75rem" : step === 2 ? "0.75rem" : step === 4 ? "0.75rem" : "2rem",
+          paddingTop: step === 0 ? "2.25rem" : step === 2 ? "2.75rem" : step === 3 ? "2.75rem" : step === 5 ? "2.5rem" : "4rem",
+          paddingBottom: step === 0 ? "1.5rem" : step === 2 ? "1.25rem" : step === 5 ? "1.25rem" : "2rem",
           textAlign: IS_PORTRAIT ? "left" : "center",
           opacity: visible ? 1 : 0,
           transform: visible ? "translateY(0)" : "translateY(-10px)",
           transition: "opacity 0.28s ease, transform 0.28s ease",
         }}>
 
-        {/* Step label — hidden on portrait step */}
-        {!IS_PORTRAIT && (
+        {/* Step label — hidden on portrait step. On the contrast step it's
+            shown above the progress dots instead (see below), so skip it here. */}
+        {!IS_PORTRAIT && step !== 1 && (
           <p style={{ ...labelStyle, marginBottom: step === 0 ? "0.75rem" : "1.6rem" }}>
             {STEP_LABELS[step]}
           </p>
         )}
 
-        {step === 0 && <StepColors     profile={profile} toggle={toggleColor} />}
-        {step === 1 && <StepContrast   profile={profile} setProfile={setProfile} />}
-        {step === 2 && <StepWorld      profile={profile} setProfile={setProfile} />}
-        {step === 3 && <StepSilhouette profile={profile} setProfile={setProfile} />}
-        {step === 4 && <StepAesthetic  profile={profile} toggle={toggleAesthetic} />}
-        {step === 5 && <StepPortrait   profile={profile} onReady={() => setPortraitReady(true)} />}
+        {step === 0 && <StepColors       profile={profile} toggle={toggleColor} />}
+        {step === 1 && <StepContrast     profile={profile} setProfile={setProfile} />}
+        {step === 2 && <StepWorld        profile={profile} setProfile={setProfile} />}
+        {step === 3 && <StepSilhouette   profile={profile} setProfile={setProfile} />}
+        {step === 4 && <StepGender       profile={profile} setProfile={setProfile} />}
+        {step === 5 && <StepAesthetic    profile={profile} toggle={toggleAesthetic} />}
+        {step === 6 && <StepPortrait     profile={profile} onReady={() => setPortraitReady(true)} />}
 
-        {/* Continue / Skip — counter-filter keeps gold vivid across all step atmospheres */}
-        <div style={{ filter: "saturate(2) brightness(1.12)", display: "flex", flexDirection: "column", alignItems: "center", visibility: IS_PORTRAIT && !portraitReady ? "hidden" : "visible" }}>
+        {/* Continue / Skip */}
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", visibility: IS_PORTRAIT && !portraitReady ? "hidden" : "visible" }}>
           <button
             onClick={advance}
             disabled={!canAdvance}
             className="group relative inline-flex items-center"
             style={{
-              marginTop: IS_PORTRAIT ? "2.5rem" : step === 0 ? "1rem" : step === 2 ? "0.75rem" : step === 4 ? "0.75rem" : "2.5rem",
-              opacity: canAdvance ? 1 : 0.32,
+              marginTop: IS_PORTRAIT ? "2.5rem" : step === 0 ? "1rem" : step === 2 ? "0.75rem" : step === 5 ? "0.75rem" : "2.5rem",
+              opacity: canAdvance ? 1 : 0.28,
               transition: IS_PORTRAIT ? "opacity 2.4s ease" : "opacity 0.5s",
             }}
           >
-            <span className="absolute inset-0" style={{ border: "1px solid rgba(201,168,76,0.7)", background: "rgba(201,168,76,0.08)" }} />
-            <span className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300" style={{ border: "1px solid rgba(201,168,76,0.95)", background: "rgba(201,168,76,0.18)" }} />
-            <span className="relative px-9 py-3" style={{ fontFamily: "var(--font-jost)", fontSize: "0.7rem", letterSpacing: "0.3em", textTransform: "uppercase", color: "rgba(220,188,90,1)" }}>
+            <span className="absolute inset-0" style={{ border: "1px solid #1A120A", background: "#1A120A" }} />
+            <span className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300" style={{ border: "1px solid #2C1E0F", background: "#2C1E0F" }} />
+            <span className="relative px-9 py-3" style={{ fontFamily: "var(--font-jost)", fontSize: "0.7rem", letterSpacing: "0.3em", textTransform: "uppercase", color: "#F5F0E8" }}>
               {IS_PORTRAIT ? "Begin Your Curation" : "Continue"}
             </span>
           </button>
 
           {/* Skip — hidden on portrait step */}
           {!IS_PORTRAIT && (
-            <button onClick={skip} style={{ marginTop: "1rem", fontFamily: "var(--font-jost)", fontSize: "0.52rem", letterSpacing: "0.22em", textTransform: "uppercase", color: "rgba(201,168,76,0.65)", background: "none", border: "none", cursor: "pointer" }}>
+            <button onClick={skip} style={{ marginTop: "1rem", fontFamily: "var(--font-jost)", fontSize: "0.52rem", letterSpacing: "0.22em", textTransform: "uppercase", color: "rgba(26,18,10,0.4)", background: "none", border: "none", cursor: "pointer" }}>
               Skip for now
             </button>
           )}
 
           {/* Back — shown from step 1 onward, hidden on portrait step */}
           {step > 0 && !IS_PORTRAIT && (
-            <button onClick={goBack} style={{ marginTop: "1.1rem", background: "none", border: "none", cursor: "pointer", color: "rgba(201,168,76,0.38)", fontSize: "0.9rem", lineHeight: 1, transition: "color 0.25s" }}
-              onMouseEnter={e => (e.currentTarget.style.color = "rgba(201,168,76,0.65)")}
-              onMouseLeave={e => (e.currentTarget.style.color = "rgba(201,168,76,0.38)")}
+            <button onClick={goBack} style={{ marginTop: "1.1rem", background: "none", border: "none", cursor: "pointer", color: "rgba(26,18,10,0.3)", fontSize: "0.9rem", lineHeight: 1, transition: "color 0.25s" }}
+              onMouseEnter={e => (e.currentTarget.style.color = "rgba(26,18,10,0.6)")}
+              onMouseLeave={e => (e.currentTarget.style.color = "rgba(26,18,10,0.3)")}
               title="Go back"
             >
               ↩
@@ -724,7 +837,7 @@ export default function ProfileIntake({ onComplete }: { onComplete: (p: UserProf
         </div>
       </div>
 
-      {/* Bottom rule — colour shifts per step */}
+      {/* Bottom rule — color shifts per step */}
       <div className="absolute bottom-0 left-0 right-0 h-px"
         style={{ background: `linear-gradient(to right, transparent, ${atm.rule} 20%, ${atm.rule} 80%, transparent)`, transition: "background 0.6s ease" }} />
     </div>

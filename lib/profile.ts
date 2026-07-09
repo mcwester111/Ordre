@@ -1,0 +1,106 @@
+import { createClient } from "@/lib/supabase/client";
+import type { UserProfile } from "@/components/ProfileIntake";
+import type { AiNotes } from "@/lib/account";
+import { EMPTY_NOTES } from "@/lib/account";
+
+export const PROFILE_KEY = "ordre.profile.v1";
+
+// ── Supabase helpers ─────────────────────────────────────────────────────────
+
+export async function loadProfileFromSupabase(): Promise<UserProfile | null> {
+  const supabase = createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return null;
+
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("colors, contrast, world, silhouette, gender, aesthetic")
+    .eq("id", user.id)
+    .single();
+
+  if (error || !data || !Array.isArray(data.colors)) return null;
+
+  return {
+    colors: data.colors ?? [],
+    environments: [],
+    contrast: data.contrast ?? "",
+    world: data.world ?? "",
+    silhouette: data.silhouette ?? "",
+    gender: data.gender ?? "womenswear",
+    aesthetic: data.aesthetic ?? [],
+  };
+}
+
+export async function saveProfileToSupabase(profile: UserProfile): Promise<void> {
+  const supabase = createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return;
+
+  await supabase.from("profiles").upsert({
+    id: user.id,
+    colors: profile.colors,
+    contrast: profile.contrast,
+    world: profile.world,
+    silhouette: profile.silhouette,
+    gender: profile.gender,
+    aesthetic: profile.aesthetic,
+  });
+}
+
+// ── Notes (Supabase) ─────────────────────────────────────────────────────────
+
+export async function loadNotesFromSupabase(): Promise<AiNotes | null> {
+  const supabase = createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return null;
+
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("preferred_name, loves, notes, avoid")
+    .eq("id", user.id)
+    .single();
+
+  if (error || !data) return null;
+
+  return {
+    preferredName: data.preferred_name ?? "",
+    loves: data.loves ?? "",
+    notes: data.notes ?? "",
+    avoid: data.avoid ?? "",
+  };
+}
+
+export async function saveNotesToSupabase(notes: AiNotes): Promise<void> {
+  const supabase = createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return;
+
+  await supabase.from("profiles").upsert({
+    id: user.id,
+    preferred_name: notes.preferredName,
+    loves: notes.loves,
+    notes: notes.notes,
+    avoid: notes.avoid,
+  });
+}
+
+// ── localStorage helpers ─────────────────────────────────────────────────────
+
+export function loadProfileFromStorage(): UserProfile | null {
+  try {
+    const raw = localStorage.getItem(PROFILE_KEY);
+    if (!raw) return null;
+    const saved = JSON.parse(raw) as UserProfile;
+    return saved && Array.isArray(saved.colors) ? saved : null;
+  } catch {
+    return null;
+  }
+}
+
+export function saveProfileToStorage(profile: UserProfile): void {
+  try {
+    localStorage.setItem(PROFILE_KEY, JSON.stringify(profile));
+  } catch {
+    /* storage full or blocked */
+  }
+}

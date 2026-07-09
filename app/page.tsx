@@ -2,10 +2,12 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { splashIsDone } from "@/lib/splash-signal";
 import Footer from "@/components/Footer";
 import SplashScreen from "@/components/SplashScreen";
+import { createClient } from "@/lib/supabase/client";
 
 
 export default function LandingPage() {
@@ -14,6 +16,27 @@ export default function LandingPage() {
   const taglineRef = useRef<HTMLDivElement>(null);
   const ctaRef     = useRef<HTMLDivElement>(null);
   const navRef     = useRef<HTMLElement>(null);
+  const router = useRouter();
+  const [userName, setUserName] = useState<string | null>(null);
+
+  useEffect(() => {
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      setUserName(user?.user_metadata?.name ?? user?.email ?? null);
+    });
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      const user = session?.user;
+      setUserName(user?.user_metadata?.name ?? user?.email ?? null);
+    });
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const handleSignOut = async () => {
+    const supabase = createClient();
+    await supabase.auth.signOut();
+    setUserName(null);
+    router.refresh();
+  };
 
   // Use Web Animations API for explicit control. CSS keyframe animations
   // triggered by React class swaps were either being optimized away or
@@ -61,7 +84,7 @@ export default function LandingPage() {
       emerge(swanRef.current,    0,    700);  // swan
       emerge(ordreRef.current,   400, 1600);  // ORDRE
       emerge(taglineRef.current, 1700, 1200); // tagline
-      emerge(ctaRef.current,     1700, 1200); // CTA + sign-in
+      fade(ctaRef.current,       1700, 1200); // CTA + sign-in
       fade(navRef.current,       2000,  220); // nav
     };
 
@@ -106,17 +129,16 @@ export default function LandingPage() {
         style={{ background: "linear-gradient(to bottom, transparent, rgba(110,80,40,0.15) 20%, rgba(110,80,40,0.15) 80%, transparent)" }} />
 
       {/* Nav — emerges last. Matches the sub-page split layout exactly:
-          ORDRE | ABOUT on the left, CURATIONS | JOURNAL | SIGN IN on the right.
+          ORDRE | ABOUT on the left, CURATIONS | SIGN IN on the right.
           Start invisible so no flash before WAAPI takes over on first load. */}
       <header ref={navRef}
-        className="absolute top-0 left-0 right-0 z-20 flex items-center justify-between px-8 py-5"
+        className="fixed top-0 left-0 right-0 z-20 flex items-center justify-between px-8 py-5"
         style={{ opacity: 0 }}>
         <nav className="flex items-center gap-8">
           {([
             { label: "ORDRE",     href: "/"          },
             { label: "ABOUT",     href: "/about"     },
             { label: "CURATIONS", href: "/curations" },
-            { label: "JOURNAL",   href: "/journal"   },
           ] as const).map(({ label, href }) => (
             <Link key={label} href={href} style={{
               fontFamily: "var(--font-jost)",
@@ -132,16 +154,43 @@ export default function LandingPage() {
             </Link>
           ))}
         </nav>
-        <a href="/sign-in" style={{
-          fontFamily: "var(--font-jost)",
-          fontSize: "0.55rem",
-          letterSpacing: "0.25em",
-          textTransform: "uppercase",
-          color: "rgba(26,18,10,0.5)",
-          textDecoration: "none",
-        }}>
-          SIGN IN
-        </a>
+        {userName ? (
+          <div className="flex items-center gap-4">
+            <span style={{
+              fontFamily: "var(--font-jost)",
+              fontSize: "0.55rem",
+              letterSpacing: "0.25em",
+              textTransform: "uppercase",
+              color: "rgba(26,18,10,0.5)",
+            }}>
+              {userName.split(" ")[0]}
+            </span>
+            <button onClick={handleSignOut} style={{
+              background: "none",
+              border: "none",
+              padding: 0,
+              fontFamily: "var(--font-jost)",
+              fontSize: "0.55rem",
+              letterSpacing: "0.25em",
+              textTransform: "uppercase",
+              color: "rgba(26,18,10,0.5)",
+            }}>
+              SIGN OUT
+            </button>
+          </div>
+        ) : (
+          <Link href="/sign-in" style={{
+            fontFamily: "var(--font-jost)",
+            fontSize: "0.55rem",
+            letterSpacing: "0.25em",
+            textTransform: "uppercase",
+            color: "rgba(26,18,10,0.5)",
+            textDecoration: "none",
+            outline: "none",
+          }}>
+            SIGN IN
+          </Link>
+        )}
       </header>
 
       {/* Centered content stack: swan + ORDRE, then tagline below.
@@ -200,73 +249,20 @@ export default function LandingPage() {
         {/* CTA — emerges third, in flow below the tagline */}
         <div ref={ctaRef}
           className="flex flex-col items-center"
-          style={{ opacity: 0, filter: "brightness(1.7) contrast(0.3)", marginTop: "2.75rem" }}>
-          <Link
-            href="/curator"
-            className="group relative inline-flex items-center"
-            style={{ borderRadius: "2px" }}
-          >
-            {/* Soft outer drop shadow — always present, gives the button a quiet
-                sit-on-paper presence with no harsh edge. */}
-            <span
-              className="absolute inset-0 pointer-events-none"
-              style={{
-                borderRadius: "2px",
-                boxShadow: "0 8px 22px -10px rgba(35,18,5,0.42), 0 2px 6px -2px rgba(35,18,5,0.18)",
-              }}
-            />
-            {/* Outer candlelight glow — fades in on hover as a warm halo. */}
-            <span
-              className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-[900ms] ease-out pointer-events-none"
-              style={{
-                borderRadius: "2px",
-                boxShadow: "0 0 42px -2px rgba(190,115,40,0.42), 0 0 90px -10px rgba(165,90,25,0.22), 0 10px 28px -10px rgba(35,18,5,0.45)",
-              }}
-            />
-            {/* Translucent dark base + pressed-lacquer inner shadow. The slight
-                translucency lets the parchment whisper through. */}
-            <span
-              className="absolute inset-0"
-              style={{
-                background: "rgba(20,12,5,0.86)",
-                borderRadius: "2px",
-                boxShadow: "inset 0 1px 2px rgba(0,0,0,0.55), inset 0 -1px 1px rgba(220,170,90,0.06), inset 0 0 0 1px rgba(0,0,0,0.18)",
-              }}
-            />
-            {/* Subtle paper-grain overlay so the surface reads as printed lacquer
-                on textured stock rather than flat fill. */}
-            <span
-              className="absolute inset-0 pointer-events-none"
-              style={{
-                backgroundImage: "url('/paper.png')",
-                backgroundSize: "220%",
-                backgroundPosition: "center",
-                mixBlendMode: "overlay",
-                opacity: 0.32,
-                borderRadius: "2px",
-              }}
-            />
-            {/* Candlelight wash — a radial warmth that bleeds in from the center
-                on hover, like a candle being brought close to lacquer. */}
-            <span
-              className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-[900ms] ease-out pointer-events-none"
-              style={{
-                background: "radial-gradient(130% 220% at center, rgba(200,125,45,0.42), rgba(165,90,25,0.16) 45%, transparent 82%)",
-                borderRadius: "2px",
-              }}
-            />
-            <span
-              className="relative tracking-[0.34em] uppercase transition-colors duration-700 text-center"
-              style={{
-                padding: "0.7rem 3.5rem",
-                fontFamily: "var(--font-jost)",
-                fontSize: "0.56rem",
-                fontWeight: 400,
-                color: "rgba(245,238,220,0.92)",
-              }}
-            >
-              Begin Your Curation
-            </span>
+          style={{ opacity: 0, marginTop: "2.75rem" }}>
+          <Link href="/curator" style={{ display: "inline-block" }}>
+            <div className="cta-btn-wrapper">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/CTA001-bg-removed.png"
+                alt="Discover"
+                style={{
+                  display: "block",
+                  height: "58px",
+                  width: "auto",
+                }}
+              />
+            </div>
           </Link>
           <a href="/sign-in" style={{
             marginTop: "1.25rem",
