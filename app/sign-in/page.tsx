@@ -89,7 +89,7 @@ export default function SignInPage() {
       password: createPass,
       options: {
         data: { name: `${createFirst.trim()} ${createLast.trim()}` },
-        emailRedirectTo: `${window.location.origin}/auth/confirm`,
+        emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL ?? window.location.origin}/auth/confirm`,
       },
     });
     if (error) {
