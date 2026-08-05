@@ -25,7 +25,7 @@ export default function ConfirmedModal() {
       style={{
         position: "fixed",
         inset: 0,
-        zIndex: 100,
+        zIndex: 10000,
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
