@@ -484,17 +484,21 @@ export default function ProfilePanel({
                     onBlur={() => persist(notes)}
                     style={FIELD_BASE as React.CSSProperties}
                   />
+                </div>
+
+                <div>
+                  <label htmlFor="note-nickname" style={{ ...LABEL, color: INK, fontSize: "0.6rem", letterSpacing: "0.16em" }}>
+                    Nickname
+                  </label>
                   <input
+                    id="note-nickname"
                     className="nickname-input"
                     value={notes.nickname}
                     placeholder="Optional"
                     onChange={(e) => updateField("nickname", e.target.value)}
                     onBlur={() => persist(notes)}
-                    style={{ ...(FIELD_BASE as React.CSSProperties), marginTop: "0.5rem" }}
+                    style={FIELD_BASE as React.CSSProperties}
                   />
-                  <p style={{ fontFamily: "var(--font-jost)", fontSize: "0.48rem", letterSpacing: "0.14em", textTransform: "uppercase", color: MUTED, marginTop: "0.4rem" }}>
-                    Nickname — only your AI curator will use this
-                  </p>
                 </div>
 
                 {NOTE_FIELDS.map((f) => (
