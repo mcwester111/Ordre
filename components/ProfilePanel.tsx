@@ -257,7 +257,11 @@ export default function ProfilePanel({
             </p>
 
             {/* ── Your Mark ── */}
-            <section style={{ marginBottom: "2.6rem", display: "flex", flexDirection: "column", alignItems: "center" }}>
+            <section style={{ marginBottom: "2.6rem" }}>
+              <h2 style={{ ...LABEL, color: INK, fontSize: "0.6rem", letterSpacing: "0.16em", marginBottom: "1.2rem" }}>
+                Your Mark
+              </h2>
+
               {!markExpanded && avatarSymbol !== "none" ? (
                 /* Collapsed: single button showing the current mark */
                 (() => {
@@ -280,6 +284,7 @@ export default function ProfilePanel({
                         padding: "0.5rem 1rem 0.5rem 0.6rem",
                         cursor: "pointer",
                         transition: "border-color 0.18s",
+                        width: "100%",
                       }}
                       onMouseEnter={e => (e.currentTarget.style.borderColor = "rgba(100,65,15,0.35)")}
                       onMouseLeave={e => (e.currentTarget.style.borderColor = LINE)}
