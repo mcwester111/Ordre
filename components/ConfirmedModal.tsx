@@ -39,10 +39,10 @@ export default function ConfirmedModal() {
       <div
         onClick={(e) => e.stopPropagation()}
         style={{
-          width: "min(340px, 85vw)",
-          padding: "2.6rem 2.4rem 2.8rem",
+          width: "min(440px, 88vw)",
+          padding: "2.8rem 2.8rem 3rem",
           backgroundColor: "#0e0b08",
-          border: "1px solid rgba(200,170,110,0.12)",
+          border: "1px solid rgba(200,170,110,0.14)",
           textAlign: "center",
           position: "relative",
           animation: "slideUpModal 0.35s cubic-bezier(0.22,1,0.36,1) both",
