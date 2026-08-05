@@ -469,7 +469,7 @@ export default function ProfilePanel({
                 conversation with your curator.
               </p>
 
-              <style>{`.nickname-input::placeholder { color: rgba(26,18,10,0.35); font-style: italic; }`}</style>
+              <style>{`.nickname-input::placeholder { color: rgba(26,18,10,0.35); }`}</style>
               <div style={{ display: "flex", flexDirection: "column", gap: "1.4rem" }}>
                 {/* Your Name + Nickname */}
                 <div>
