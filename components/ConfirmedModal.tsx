@@ -9,8 +9,12 @@ export default function ConfirmedModal() {
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    if (params.get("confirmed") === "true") setConfirmed(true);
-  }, []);
+    if (params.get("confirmed") === "true") {
+      setConfirmed(true);
+      const t = setTimeout(() => router.push("/curator"), 3000);
+      return () => clearTimeout(t);
+    }
+  }, [router]);
 
   const dismiss = useCallback(() => {
     setConfirmed(false);
@@ -30,17 +34,18 @@ export default function ConfirmedModal() {
         alignItems: "center",
         justifyContent: "center",
         padding: "2rem",
-        background: "rgba(14,11,8,0.72)",
-        backdropFilter: "blur(6px)",
-        WebkitBackdropFilter: "blur(6px)",
+        background: "rgba(18,12,6,0.42)",
+        backdropFilter: "blur(2px)",
+        WebkitBackdropFilter: "blur(2px)",
         animation: "fadeInOverlay 0.4s ease both",
       }}
     >
       <div
         onClick={(e) => e.stopPropagation()}
         style={{
-          width: "min(440px, 88vw)",
-          padding: "2.8rem 2.8rem 3rem",
+          width: "min(380px, 88vw)",
+          padding: "2.6rem 2.6rem 4.5rem",
+          marginTop: "4rem",
           backgroundColor: "#0e0b08",
           border: "1px solid rgba(200,170,110,0.14)",
           textAlign: "center",
@@ -72,22 +77,6 @@ export default function ConfirmedModal() {
           ✕
         </button>
 
-        {/* Swan mark */}
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src="/swan-logo.png"
-          alt=""
-          aria-hidden="true"
-          style={{ width: 38, height: "auto", margin: "0 auto 1.6rem", display: "block", opacity: 0.65 }}
-        />
-
-        <div style={{
-          width: 32,
-          height: "1px",
-          background: "rgba(200,170,110,0.22)",
-          margin: "0 auto 1.8rem",
-        }} />
-
         <p style={{
           fontFamily: "var(--font-cormorant)",
           fontSize: "1.38rem",
@@ -111,7 +100,7 @@ export default function ConfirmedModal() {
           marginBottom: "2.2rem",
           lineHeight: 2,
         }}>
-          You may now access your account.
+          You may access your profile.
         </p>
 
         <a
@@ -119,13 +108,13 @@ export default function ConfirmedModal() {
           style={{
             display: "inline-block",
             fontFamily: "var(--font-jost)",
-            fontSize: "0.44rem",
+            fontSize: "0.52rem",
             fontWeight: 600,
-            letterSpacing: "0.32em",
+            letterSpacing: "0.28em",
             textTransform: "uppercase",
             color: "rgba(235,220,195,0.78)",
             border: "1px solid rgba(200,170,110,0.32)",
-            padding: "0.7rem 2rem",
+            padding: "0.9rem 2.6rem",
             textDecoration: "none",
             transition: "border-color 0.3s ease, color 0.3s ease",
           }}
@@ -140,7 +129,7 @@ export default function ConfirmedModal() {
             el.style.color = "rgba(235,220,195,0.78)";
           }}
         >
-          Access Account
+          Access Profile
         </a>
       </div>
     </div>

@@ -8,6 +8,9 @@ import { splashIsDone } from "@/lib/splash-signal";
 import Footer from "@/components/Footer";
 import SplashScreen from "@/components/SplashScreen";
 import ConfirmedModal from "@/components/ConfirmedModal";
+import ProfilePanel from "@/components/ProfilePanel";
+import { SYMBOLS, SymbolSvg } from "@/lib/avatar-symbols";
+import { loadAvatarFromSupabase } from "@/lib/profile";
 import { createClient } from "@/lib/supabase/client";
 
 
@@ -19,11 +22,19 @@ export default function LandingPage() {
   const navRef     = useRef<HTMLElement>(null);
   const router = useRouter();
   const [userName, setUserName] = useState<string | null>(null);
+  const [showProfile, setShowProfile] = useState(false);
+  const [avatarSymbolId, setAvatarSymbolId] = useState<string>("none");
+  const [avatarLabel, setAvatarLabel] = useState<"name" | "initial" | "none">("initial");
 
   useEffect(() => {
     const supabase = createClient();
     supabase.auth.getUser().then(({ data: { user } }) => {
       setUserName(user?.user_metadata?.name ?? user?.email ?? null);
+      if (user) {
+        loadAvatarFromSupabase().then(av => {
+          if (av) { setAvatarSymbolId(av.symbol); setAvatarLabel(av.label as "name" | "initial" | "none"); }
+        });
+      }
     });
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       const user = session?.user;
@@ -118,6 +129,14 @@ export default function LandingPage() {
     <main className="relative min-h-screen overflow-hidden flex flex-col items-center">
       <SplashScreen />
       <ConfirmedModal />
+      {showProfile && (
+        <ProfilePanel
+          userProfile={null}
+          onClose={() => setShowProfile(false)}
+          onRefineAesthetic={() => setShowProfile(false)}
+          onNotesChange={() => {}}
+        />
+      )}
 
       {/* Horizontal rules */}
       <div className="absolute top-0 left-0 right-0 h-px z-10"
@@ -156,31 +175,60 @@ export default function LandingPage() {
             </Link>
           ))}
         </nav>
-        {userName ? (
-          <div className="flex items-center gap-4">
-            <span style={{
-              fontFamily: "var(--font-jost)",
-              fontSize: "0.55rem",
-              letterSpacing: "0.25em",
-              textTransform: "uppercase",
-              color: "rgba(26,18,10,0.5)",
-            }}>
-              {userName.split(" ")[0]}
-            </span>
-            <button onClick={handleSignOut} style={{
-              background: "none",
-              border: "none",
-              padding: 0,
-              fontFamily: "var(--font-jost)",
-              fontSize: "0.55rem",
-              letterSpacing: "0.25em",
-              textTransform: "uppercase",
-              color: "rgba(26,18,10,0.5)",
-            }}>
-              SIGN OUT
+        {userName ? (() => {
+          const sym = SYMBOLS.find(s => s.id === avatarSymbolId);
+          const labelText = avatarLabel === "name"
+            ? userName.split(" ")[0]
+            : avatarLabel === "initial"
+            ? userName.charAt(0).toUpperCase()
+            : null;
+          return (
+            <button
+              onClick={() => setShowProfile(true)}
+              style={{
+                background: "none",
+                border: "none",
+                padding: 0,
+                cursor: "pointer",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                gap: "3px",
+                opacity: 0.7,
+                transition: "opacity 0.2s",
+              }}
+              onMouseEnter={e => (e.currentTarget.style.opacity = "1")}
+              onMouseLeave={e => (e.currentTarget.style.opacity = "0.7")}
+              aria-label="Open profile"
+            >
+              {sym ? (
+                <SymbolSvg symbol={sym} size={20} color="rgba(26,18,10,0.8)" />
+              ) : (
+                <span style={{
+                  fontFamily: "var(--font-jost)",
+                  fontSize: "0.55rem",
+                  letterSpacing: "0.2em",
+                  textTransform: "uppercase",
+                  color: "rgba(26,18,10,0.7)",
+                }}>
+                  {userName.charAt(0).toUpperCase()}
+                </span>
+              )}
+              {labelText && (
+                <span style={{
+                  fontFamily: "var(--font-jost)",
+                  fontSize: "0.38rem",
+                  letterSpacing: "0.18em",
+                  textTransform: "uppercase",
+                  color: "rgba(26,18,10,0.55)",
+                  lineHeight: 1,
+                }}>
+                  {labelText}
+                </span>
+              )}
             </button>
-          </div>
-        ) : (
+          );
+        })() : (
           <Link href="/sign-in" style={{
             fontFamily: "var(--font-jost)",
             fontSize: "0.55rem",
