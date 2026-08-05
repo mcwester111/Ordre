@@ -490,11 +490,12 @@ export default function ProfilePanel({
                   <label htmlFor="note-nickname" style={{ ...LABEL, color: INK, fontSize: "0.6rem", letterSpacing: "0.16em" }}>
                     Nickname
                   </label>
+                  <style>{`.nickname-input::placeholder { font-style: italic; opacity: 0.75; }`}</style>
                   <input
                     id="note-nickname"
                     className="nickname-input"
                     value={notes.nickname}
-                    placeholder="Optional"
+                    placeholder="optional"
                     onChange={(e) => updateField("nickname", e.target.value)}
                     onBlur={() => persist(notes)}
                     style={FIELD_BASE as React.CSSProperties}
