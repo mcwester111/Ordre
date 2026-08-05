@@ -84,6 +84,35 @@ export async function saveNotesToSupabase(notes: AiNotes): Promise<void> {
   });
 }
 
+// ── Avatar stamp (Supabase) ──────────────────────────────────────────────────
+
+export async function loadAvatarFromSupabase(): Promise<{ symbol: string; label: string } | null> {
+  const supabase = createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return null;
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("avatar_symbol, avatar_label")
+    .eq("id", user.id)
+    .single();
+  if (error || !data) return null;
+  return {
+    symbol: data.avatar_symbol ?? "none",
+    label: data.avatar_label ?? "initial",
+  };
+}
+
+export async function saveAvatarToSupabase(avatar: { symbol: string; label: string }): Promise<void> {
+  const supabase = createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return;
+  await supabase.from("profiles").upsert({
+    id: user.id,
+    avatar_symbol: avatar.symbol,
+    avatar_label: avatar.label,
+  });
+}
+
 // ── localStorage helpers ─────────────────────────────────────────────────────
 
 export function loadProfileFromStorage(): UserProfile | null {

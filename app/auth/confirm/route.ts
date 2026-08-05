@@ -34,5 +34,5 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(new URL("/sign-in?error=invalid_token", request.url));
   }
 
-  return NextResponse.redirect(new URL(next, request.url));
+  return NextResponse.redirect(new URL("/?confirmed=true", request.url));
 }

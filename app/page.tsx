@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { splashIsDone } from "@/lib/splash-signal";
 import Footer from "@/components/Footer";
 import SplashScreen from "@/components/SplashScreen";
+import ConfirmedModal from "@/components/ConfirmedModal";
 import { createClient } from "@/lib/supabase/client";
 
 
@@ -116,6 +117,7 @@ export default function LandingPage() {
   return (
     <main className="relative min-h-screen overflow-hidden flex flex-col items-center">
       <SplashScreen />
+      <ConfirmedModal />
 
       {/* Horizontal rules */}
       <div className="absolute top-0 left-0 right-0 h-px z-10"
