@@ -57,7 +57,6 @@ type NoteField = {
 };
 
 const NOTE_FIELDS: NoteField[] = [
-  { key: "preferredName", label: "What should we call you?", placeholder: "e.g. Call me Margot", rows: 1 },
   { key: "loves", label: "Houses, designers & pieces you love", placeholder: "e.g. Remember I love Chanel, The Row, and anything in camel.", rows: 2 },
   { key: "notes", label: "Anything to always keep in mind", placeholder: "e.g. I dress for cold weather most of the year, and I prefer flats.", rows: 2 },
   { key: "avoid", label: "Anything to avoid", placeholder: "e.g. Never suggest fast fashion or visible logos.", rows: 2 },
@@ -470,7 +469,34 @@ export default function ProfilePanel({
                 conversation with your curator.
               </p>
 
+              <style>{`.nickname-input::placeholder { color: rgba(26,18,10,0.35); font-style: italic; }`}</style>
               <div style={{ display: "flex", flexDirection: "column", gap: "1.4rem" }}>
+                {/* Your Name + Nickname */}
+                <div>
+                  <label htmlFor="note-preferredName" style={{ ...LABEL, color: INK, fontSize: "0.6rem", letterSpacing: "0.16em" }}>
+                    Your Name
+                  </label>
+                  <input
+                    id="note-preferredName"
+                    value={notes.preferredName}
+                    placeholder="Your full name"
+                    onChange={(e) => updateField("preferredName", e.target.value)}
+                    onBlur={() => persist(notes)}
+                    style={FIELD_BASE as React.CSSProperties}
+                  />
+                  <input
+                    className="nickname-input"
+                    value={notes.nickname}
+                    placeholder="Optional"
+                    onChange={(e) => updateField("nickname", e.target.value)}
+                    onBlur={() => persist(notes)}
+                    style={{ ...(FIELD_BASE as React.CSSProperties), marginTop: "0.5rem" }}
+                  />
+                  <p style={{ fontFamily: "var(--font-jost)", fontSize: "0.48rem", letterSpacing: "0.14em", textTransform: "uppercase", color: MUTED, marginTop: "0.4rem" }}>
+                    Nickname — only your AI curator will use this
+                  </p>
+                </div>
+
                 {NOTE_FIELDS.map((f) => (
                   <div key={f.key}>
                     <label

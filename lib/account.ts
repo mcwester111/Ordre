@@ -15,14 +15,16 @@ export type Account = {
 };
 
 export type AiNotes = {
-  preferredName: string; // "call me by X name"
-  loves: string; // "remember I love Chanel"
-  notes: string; // anything else to always keep in mind
-  avoid: string; // things never to suggest
+  preferredName: string; // full name shown on profile
+  nickname: string;      // optional alias for the AI curator
+  loves: string;
+  notes: string;
+  avoid: string;
 };
 
 export const EMPTY_NOTES: AiNotes = {
   preferredName: "",
+  nickname: "",
   loves: "",
   notes: "",
   avoid: "",
@@ -90,7 +92,9 @@ export function buildNotesDescription(n: AiNotes): string {
   const notes = n.notes.trim();
   const avoid = n.avoid.trim();
 
-  if (name) bits.push(`The client wishes to be addressed as "${name}".`);
+  const nickname = n.nickname.trim();
+  if (nickname) bits.push(`The client's preferred name for the curator is "${nickname}".`);
+  else if (name) bits.push(`The client's name is "${name}".`);
   if (loves) bits.push(`Houses, designers, and pieces the client loves: ${loves}.`);
   if (notes) bits.push(`Standing notes from the client to always keep in mind: ${notes}.`);
   if (avoid) bits.push(`The client asks that you avoid: ${avoid}.`);
@@ -100,6 +104,6 @@ export function buildNotesDescription(n: AiNotes): string {
 
 export function hasAnyNotes(n: AiNotes): boolean {
   return Boolean(
-    n.preferredName.trim() || n.loves.trim() || n.notes.trim() || n.avoid.trim()
+    n.preferredName.trim() || n.nickname.trim() || n.loves.trim() || n.notes.trim() || n.avoid.trim()
   );
 }

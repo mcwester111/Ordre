@@ -56,7 +56,7 @@ export async function loadNotesFromSupabase(): Promise<AiNotes | null> {
 
   const { data, error } = await supabase
     .from("profiles")
-    .select("preferred_name, loves, notes, avoid")
+    .select("preferred_name, nickname, loves, notes, avoid")
     .eq("id", user.id)
     .single();
 
@@ -64,6 +64,7 @@ export async function loadNotesFromSupabase(): Promise<AiNotes | null> {
 
   return {
     preferredName: data.preferred_name ?? "",
+    nickname: data.nickname ?? "",
     loves: data.loves ?? "",
     notes: data.notes ?? "",
     avoid: data.avoid ?? "",
@@ -78,6 +79,7 @@ export async function saveNotesToSupabase(notes: AiNotes): Promise<void> {
   await supabase.from("profiles").upsert({
     id: user.id,
     preferred_name: notes.preferredName,
+    nickname: notes.nickname,
     loves: notes.loves,
     notes: notes.notes,
     avoid: notes.avoid,
