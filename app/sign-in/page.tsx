@@ -605,7 +605,7 @@ export default function SignInPage() {
           <div
             onClick={e => e.stopPropagation()}
             style={{
-              width: "min(348px, 88vw)",
+              width: createStatus === "sent" ? "min(300px, 82vw)" : "min(348px, 88vw)",
               maxHeight: "88vh",
               overflowY: "auto",
               padding: "2.2rem 2.2rem",
@@ -649,17 +649,39 @@ export default function SignInPage() {
 
               {createStatus === "sent" ? (
                 /* Confirmation */
-                <p style={{
-                  fontFamily: "var(--font-cormorant)",
-                  fontSize: "0.92rem",
-                  fontWeight: 600,
-                  fontStyle: "italic",
-                  color: "rgba(200,170,110,0.72)",
-                  lineHeight: 1.7,
-                  padding: "1.2rem 0",
-                }}>
-                  Welcome to Ordre.<br />Check your inbox to confirm your email.
-                </p>
+                <>
+                  {/* Corner ornaments */}
+                  {(["top:0;left:0", "top:0;right:0", "bottom:0;left:0", "bottom:0;right:0"] as const).map((pos, i) => {
+                    const [v, h] = pos.split(";");
+                    const flipX = h === "right:0";
+                    const flipY = v === "bottom:0";
+                    return (
+                      <svg key={i} viewBox="0 0 28 28" width="22" height="22" fill="none"
+                        stroke="rgba(200,170,110,0.45)" strokeWidth="0.9" strokeLinecap="round"
+                        style={{
+                          position: "absolute",
+                          [v.split(":")[0]]: v.split(":")[1],
+                          [h.split(":")[0]]: h.split(":")[1],
+                          transform: `scale(${flipX ? -1 : 1}, ${flipY ? -1 : 1})`,
+                        }}>
+                        <path d="M24 4 C14 4 4 14 4 24" />
+                        <path d="M24 4 C26 4 27 2 25 2 C23 2 23 4 24 4" />
+                        <path d="M4 24 C4 26 2 27 2 25 C2 23 4 23 4 24" />
+                      </svg>
+                    );
+                  })}
+                  <p style={{
+                    fontFamily: "var(--font-cormorant)",
+                    fontSize: "1.15rem",
+                    fontWeight: 400,
+                    fontStyle: "italic",
+                    color: "rgba(200,170,110,0.72)",
+                    lineHeight: 1.75,
+                    padding: "1.6rem 0.5rem",
+                  }}>
+                    Welcome to Ordre.<br />Check your inbox to confirm your email.
+                  </p>
+                </>
               ) : (
                 /* Form */
                 <form onSubmit={handleCreate} noValidate style={{ width: "100%", display: "flex", flexDirection: "column", gap: "1rem" }}>
