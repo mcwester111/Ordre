@@ -343,7 +343,7 @@ export default function ProfilePanel({
                         }}>
                           {sym
                             ? <SymbolSvg symbol={sym} size={38} color={GOLD} />
-                            : <span style={{ fontFamily: "var(--font-jost)", fontSize: "0.42rem", letterSpacing: "0.18em", textTransform: "uppercase", color: MUTED }}>none</span>
+                            : <span style={{ fontFamily: "var(--font-jost)", fontSize: "0.42rem", letterSpacing: "0.18em", paddingLeft: "0.18em", textTransform: "uppercase", color: MUTED }}>none</span>
                           }
                         </div>
                         {stampLabel && (
