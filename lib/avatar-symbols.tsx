@@ -55,6 +55,7 @@ export function SymbolSvg({
         backgroundSize: `${bgW}px ${bgH}px`,
         backgroundPosition: `${x}px ${y}px`,
         backgroundRepeat: "no-repeat",
+        mixBlendMode: "multiply",
         flexShrink: 0,
       }}
     />
