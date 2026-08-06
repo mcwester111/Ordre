@@ -36,7 +36,9 @@ export function SymbolSvg({
   color?: string;
 }) {
   const cellW = SHEET_W / COLS;
-  const scale  = size / cellW;
+  // Scale so the symbol illustration (avg ~222px wide in a 250.8px cell) fills
+  // the circle container. overflow:hidden clips the oval border frame.
+  const scale  = (size / cellW) * 1.38;
   const bgW    = SHEET_W * scale;
   const bgH    = SHEET_H * scale;
   const cellH  = SHEET_H / ROWS;
