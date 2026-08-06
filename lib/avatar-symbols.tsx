@@ -22,9 +22,11 @@ export const SYMBOLS: SymbolDef[] = [
   { id: "rose",      name: "Rose",     col: 4, row: 1 },
 ];
 
+// Actual vertical center of each symbol within its 627px cell row,
+// measured via canvas pixel scan (non-white content bounding box midpoint).
+const ROW_CENTER_Y = [478.5, 152.5]; // row 0, row 1
+
 // Renders one symbol from the sprite sheet, centered in a square container.
-// Each cell is portrait (SHEET_H/ROWS tall) so we scale by column width and
-// offset vertically to center the symbol.
 export function SymbolSvg({
   symbol,
   size,
@@ -37,9 +39,11 @@ export function SymbolSvg({
   const scale  = size / cellW;
   const bgW    = SHEET_W * scale;
   const bgH    = SHEET_H * scale;
-  const cellH  = bgH / ROWS;
-  const x      = -(symbol.col * size);
-  const y      = -(symbol.row * cellH + (cellH - size) / 2);
+  const cellH  = SHEET_H / ROWS;
+  // Absolute Y center of this symbol in the full image (natural px), then scaled.
+  const absCenterY = symbol.row * cellH + ROW_CENTER_Y[symbol.row];
+  const x = -(symbol.col * size);
+  const y = -(absCenterY * scale - size / 2);
 
   return (
     <div
