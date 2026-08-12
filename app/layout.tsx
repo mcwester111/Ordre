@@ -1,7 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Cormorant_Garamond, Jost, Inter } from "next/font/google";
 import "./globals.css";
-import RefreshRedirect from "@/components/RefreshRedirect";
 import CookieConsent from "@/components/CookieConsent";
 
 const cormorant = Cormorant_Garamond({
@@ -80,7 +79,6 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${cormorant.variable} ${jost.variable} ${inter.variable}`} style={{ colorScheme: "light" }}>
       <body className="font-sans antialiased">
-        <RefreshRedirect />
         {children}
         <CookieConsent />
       </body>

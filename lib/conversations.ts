@@ -17,14 +17,14 @@ export type MessageRow = {
 
 // ── Conversations ────────────────────────────────────────────────────────────
 
-export async function createConversation(title: string): Promise<string | null> {
+export async function createConversation(title: string, id?: string): Promise<string | null> {
   const supabase = createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
 
   const { data, error } = await supabase
     .from("conversations")
-    .insert({ user_id: user.id, title })
+    .insert({ ...(id ? { id } : {}), user_id: user.id, title })
     .select("id")
     .single();
 
@@ -64,6 +64,12 @@ export async function updateConversationTitle(conversationId: string, title: str
     .from("conversations")
     .update({ title })
     .eq("id", conversationId);
+}
+
+export async function deleteConversation(conversationId: string): Promise<void> {
+  const supabase = createClient();
+  await supabase.from("messages").delete().eq("conversation_id", conversationId);
+  await supabase.from("conversations").delete().eq("id", conversationId);
 }
 
 // ── Messages ─────────────────────────────────────────────────────────────────

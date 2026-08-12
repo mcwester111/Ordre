@@ -86,25 +86,69 @@ export async function saveNotesToSupabase(notes: AiNotes): Promise<void> {
   });
 }
 
-// ── Avatar stamp (Supabase) ──────────────────────────────────────────────────
+// ── Notepad (Supabase + localStorage) ────────────────────────────────────────
+
+export const NOTEPAD_KEY = "ordre.notepad.v1";
+
+export async function loadNotepadFromSupabase(): Promise<string | null> {
+  const supabase = createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return null;
+
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("notepad")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  if (error || !data) return null;
+  return (data as { notepad?: string | null }).notepad ?? null;
+}
+
+export async function saveNotepadToSupabase(content: string): Promise<void> {
+  const supabase = createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return;
+
+  await supabase.from("profiles").upsert({ id: user.id, notepad: content });
+}
+
+// ── Avatar stamp (Supabase + localStorage cache) ─────────────────────────────
+
+const AVATAR_CACHE_KEY = "ordre.avatar.v1";
+
+export function loadAvatarFromCache(): { symbol: string; label: string } | null {
+  try {
+    const raw = localStorage.getItem(AVATAR_CACHE_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch { return null; }
+}
+
+function saveAvatarToCache(avatar: { symbol: string; label: string }) {
+  try { localStorage.setItem(AVATAR_CACHE_KEY, JSON.stringify(avatar)); } catch { /* ignore */ }
+}
 
 export async function loadAvatarFromSupabase(): Promise<{ symbol: string; label: string } | null> {
   const supabase = createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
-  const { data, error } = await supabase
+  const { data } = await supabase
     .from("profiles")
     .select("avatar_symbol, avatar_label")
     .eq("id", user.id)
-    .single();
-  if (error || !data) return null;
-  return {
+    .maybeSingle();
+  if (!data) return null;
+  const av = {
     symbol: data.avatar_symbol ?? "none",
     label: data.avatar_label ?? "initial",
   };
+  saveAvatarToCache(av);
+  return av;
 }
 
 export async function saveAvatarToSupabase(avatar: { symbol: string; label: string }): Promise<void> {
+  saveAvatarToCache(avatar);
   const supabase = createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return;
@@ -113,6 +157,13 @@ export async function saveAvatarToSupabase(avatar: { symbol: string; label: stri
     avatar_symbol: avatar.symbol,
     avatar_label: avatar.label,
   });
+}
+
+// ── Display name (auth user_metadata) ────────────────────────────────────────
+
+export async function saveNameToSupabase(first: string, last: string): Promise<void> {
+  const supabase = createClient();
+  await supabase.auth.updateUser({ data: { name: `${first.trim()} ${last.trim()}`.trim() } });
 }
 
 // ── localStorage helpers ─────────────────────────────────────────────────────

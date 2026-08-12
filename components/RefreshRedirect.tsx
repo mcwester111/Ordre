@@ -8,7 +8,8 @@ export default function RefreshRedirect() {
   const pathname = usePathname();
 
   useEffect(() => {
-    if (pathname === "/") return;
+    // Home page and the curator app always stay on refresh
+    if (pathname === "/" || pathname.startsWith("/curator")) return;
 
     const entries = performance.getEntriesByType("navigation") as PerformanceNavigationTiming[];
     if (entries[0]?.type === "reload") {

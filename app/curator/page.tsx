@@ -11,6 +11,8 @@ import {
   loadProfileFromStorage,
   saveProfileToSupabase,
   saveProfileToStorage,
+  loadNotepadFromSupabase,
+  NOTEPAD_KEY,
 } from "@/lib/profile";
 import {
   createConversation,
@@ -18,8 +20,10 @@ import {
   loadConversationMessages,
   saveMessage,
   updateConversationTitle,
+  deleteConversation,
   ConversationRow,
 } from "@/lib/conversations";
+import LeftSidebar from "@/components/LeftSidebar";
 
 type MessageImage = {
   dataUrl: string;
@@ -60,6 +64,23 @@ type ApiMessage = {
   role: "user" | "assistant";
   content: string | ApiContent[];
 };
+
+// ── Conversation cache (localStorage write-ahead buffer) ──────────────────
+// Keeps the active conversation alive across hard refreshes. Supabase writes
+// are async and can race a quick refresh; localStorage is synchronous and
+// always wins. On load we check the cache and flush any unsaved data to
+// Supabase in the background.
+const CONV_CACHE_KEY = "ordre.activeConv.v1";
+type CachedConv = { id: string; title: string; messages: { id: string; role: "user" | "assistant"; text: string }[] };
+function saveConvCache(id: string, title: string, msgs: { id: string; role: "user" | "assistant"; text: string }[]) {
+  try { localStorage.setItem(CONV_CACHE_KEY, JSON.stringify({ id, title, messages: msgs })); } catch {}
+}
+function loadConvCache(): CachedConv | null {
+  try { const r = localStorage.getItem(CONV_CACHE_KEY); return r ? JSON.parse(r) : null; } catch { return null; }
+}
+function clearConvCache() {
+  try { localStorage.removeItem(CONV_CACHE_KEY); } catch {}
+}
 
 // ── Upload safety limits ───────────────────────────────────────────────────
 // Allowlist-based handling plus hard caps so a malicious or runaway upload
@@ -287,10 +308,17 @@ export default function CuratorPage() {
   const [plusOpen, setPlusOpen] = useState(false);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [conversations, setConversations] = useState<ConversationRow[]>([]);
-  const [showHistory, setShowHistory] = useState(false);
   // Gate the first paint until we've checked storage, so returning clients
   // don't see a flash of the intake before it's skipped.
   const [hydrated, setHydrated] = useState(false);
+
+  // Keep localStorage cache in sync with the active conversation so a hard
+  // refresh can always restore the current state without a network round-trip.
+  useEffect(() => {
+    if (!conversationId || messages.length === 0) return;
+    const title = conversations.find(c => c.id === conversationId)?.title ?? "";
+    saveConvCache(conversationId, title, messages.map(m => ({ id: m.id, role: m.role, text: m.text })));
+  }, [messages, conversationId, conversations]);
 
   // Load a saved aesthetic profile — a returning client skips the intake.
   // Try Supabase first (signed-in users), fall back to localStorage.
@@ -312,20 +340,62 @@ export default function CuratorPage() {
       const account = getAccount();
       if (account?.name) setClientName(account.name);
 
-      // Load conversation history for signed-in users
-      const convos = await listConversations();
-      if (convos.length > 0) {
-        setConversations(convos);
-        const latest = convos[0];
-        const msgs = await loadConversationMessages(latest.id);
-        if (msgs.length > 0) {
-          setConversationId(latest.id);
-          setMessages(msgs.map((m) => ({
-            id: m.id,
-            role: m.role,
-            text: m.content,
-          })));
+      // Sync notepad from Supabase into localStorage so the sidebar and AI
+      // context always reflect the latest saved content across devices.
+      loadNotepadFromSupabase().then(remote => {
+        if (remote !== null) {
+          try { localStorage.setItem(NOTEPAD_KEY, remote); } catch {}
         }
+      });
+
+      // Load conversation history. Supabase is authoritative; localStorage cache
+      // covers the gap when a refresh races the async DB writes.
+      const cached = loadConvCache();
+      const convos = await listConversations();
+
+      if (convos.length > 0) {
+        const cachedMissing = cached && !convos.find(c => c.id === cached.id);
+        if (cachedMissing && cached!.messages.length > 0) {
+          // The cached conversation hasn't made it to Supabase yet — show it
+          // immediately and flush it to Supabase in the background.
+          const c = cached!;
+          setConversationId(c.id);
+          setMessages(c.messages.map(m => ({ id: m.id, role: m.role as "user" | "assistant", text: m.text })));
+          setConversations([
+            { id: c.id, title: c.title, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+            ...convos,
+          ]);
+          (async () => {
+            const saved = await createConversation(c.title, c.id);
+            if (saved) {
+              for (const m of c.messages) await saveMessage(c.id, m.role as "user" | "assistant", m.text);
+            }
+          })();
+        } else {
+          // Supabase has the conversation — it's authoritative. Load the one
+          // the user was most recently in (prefer cached id if present).
+          setConversations(convos);
+          const target = cached ? (convos.find(c => c.id === cached.id) ?? convos[0]) : convos[0];
+          const msgs = await loadConversationMessages(target.id);
+          if (msgs.length > 0) {
+            setConversationId(target.id);
+            setMessages(msgs.map(m => ({ id: m.id, role: m.role, text: m.content })));
+          }
+          clearConvCache();
+        }
+      } else if (cached && cached.messages.length > 0) {
+        // No Supabase conversations at all (guest or fast refresh) — restore
+        // from cache and attempt to flush to Supabase.
+        const c = cached;
+        setConversationId(c.id);
+        setMessages(c.messages.map(m => ({ id: m.id, role: m.role as "user" | "assistant", text: m.text })));
+        setConversations([{ id: c.id, title: c.title, created_at: new Date().toISOString(), updated_at: new Date().toISOString() }]);
+        (async () => {
+          const saved = await createConversation(c.title, c.id);
+          if (saved) {
+            for (const m of c.messages) await saveMessage(c.id, m.role as "user" | "assistant", m.text);
+          }
+        })();
       }
 
       setHydrated(true);
@@ -551,24 +621,28 @@ export default function CuratorPage() {
     setPendingDocs([]);
     setIsLoading(true);
 
-    // Create or reuse a conversation for signed-in users
+    // Create conversation in DB before saving any messages (foreign key requirement).
+    // The sidebar update is optimistic (immediate). We also write to localStorage
+    // synchronously so a refresh within the async window still restores the convo.
     let activeConversationId = conversationId;
     if (!activeConversationId) {
       const title = text.slice(0, 60) || "New conversation";
-      const newId = await createConversation(title);
-      if (newId) {
-        activeConversationId = newId;
-        setConversationId(newId);
-        setConversations((prev) => [
-          { id: newId, title, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
-          ...prev,
-        ]);
-      }
+      const newId = crypto.randomUUID();
+      activeConversationId = newId;
+      setConversationId(newId);
+      setConversations((prev) => [
+        { id: newId, title, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+        ...prev,
+      ]);
+      // Write to cache synchronously before any network calls — survives an
+      // immediate refresh even if the Supabase writes haven't landed yet.
+      saveConvCache(newId, title, newMessages.map(m => ({ id: m.id, role: m.role, text: m.text })));
+      await createConversation(title, newId);
     }
 
-    // Save user message
+    // Save user message before making the API call so a refresh preserves it
     if (activeConversationId && text) {
-      saveMessage(activeConversationId, "user", text);
+      await saveMessage(activeConversationId, "user", text);
     }
 
     try {
@@ -583,6 +657,7 @@ export default function CuratorPage() {
             userProfile ? buildProfileDescription(userProfile) : "",
             buildNotesDescription(aiNotes),
             clientName ? `The client's name is ${clientName}. They are a known client — greet them by name on the first message and do not introduce yourself.` : "",
+            (() => { try { const n = localStorage.getItem("ordre.notepad.v1"); return n?.trim() ? `The client has left themselves the following personal notes (their own reminders and thoughts — use them as context if relevant, but don't repeat them back verbatim):\n${n.trim()}` : ""; } catch { return ""; } })(),
           ]
             .filter(Boolean)
             .join("\n\n"),
@@ -691,9 +766,37 @@ export default function CuratorPage() {
     []
   );
 
+  const handleSelectConversation = async (id: string) => {
+    const msgs = await loadConversationMessages(id);
+    setMessages(msgs.map((m) => ({ id: m.id, role: m.role, text: m.content })));
+    setConversationId(id);
+  };
+
+  const handleDeleteConversation = async (id: string) => {
+    await deleteConversation(id);
+    setConversations(prev => prev.filter(x => x.id !== id));
+    if (conversationId === id) { setConversationId(null); setMessages([]); }
+  };
+
+  const handleNewConversation = () => { setMessages([]); setConversationId(null); };
+
+  const handleRenameConversation = async (id: string, title: string) => {
+    await updateConversationTitle(id, title);
+    setConversations(prev => prev.map(c => c.id === id ? { ...c, title } : c));
+  };
+
+  // Refresh the conversation list every 5 minutes so new sessions surface automatically
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      const updated = await listConversations();
+      setConversations(updated);
+    }, 5 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, []);
+
   return (
     <div
-      className="flex flex-col h-screen relative"
+      className="flex h-screen relative"
     >
       {/* Transcript background — the Ordre stationery card (swan letterhead at top,
           framed parchment), shown crisp behind the conversation. */}
@@ -713,73 +816,18 @@ export default function CuratorPage() {
           returning client never flashes the intake before it's skipped. */}
       {hydrated && showIntake && <ProfileIntake onComplete={completeIntake} />}
 
-      {/* History panel */}
-      {showHistory && (
-        <div
-          onClick={() => setShowHistory(false)}
-          style={{
-            position: "fixed", inset: 0, zIndex: 80,
-            background: "rgba(18,12,6,0.45)",
-            backdropFilter: "blur(4px)",
-            animation: "fadeInOverlay 0.2s ease both",
-          }}
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              position: "absolute", top: 0, right: 0, bottom: 0,
-              width: "min(320px, 88vw)",
-              background: "rgb(245,240,232)",
-              backgroundImage: "url('/backgroundchat.png')",
-              backgroundSize: "cover",
-              overflowY: "auto",
-              padding: "2rem 1.5rem",
-              display: "flex",
-              flexDirection: "column",
-              gap: "0.5rem",
-            }}
-          >
-            <p style={{
-              fontFamily: "var(--font-jost)",
-              fontSize: "0.5rem",
-              letterSpacing: "0.28em",
-              textTransform: "uppercase",
-              color: "rgba(26,18,10,0.4)",
-              marginBottom: "1rem",
-            }}>
-              Past Conversations
-            </p>
-            {conversations.map((c) => (
-              <button
-                key={c.id}
-                onClick={async () => {
-                  const msgs = await loadConversationMessages(c.id);
-                  setMessages(msgs.map((m) => ({ id: m.id, role: m.role, text: m.content })));
-                  setConversationId(c.id);
-                  setShowHistory(false);
-                }}
-                style={{
-                  background: c.id === conversationId ? "rgba(26,18,10,0.06)" : "none",
-                  border: "none",
-                  borderBottom: "1px solid rgba(26,18,10,0.08)",
-                  padding: "0.75rem 0.5rem",
-                  textAlign: "left",
-                  fontFamily: "var(--font-cormorant)",
-                  fontSize: "0.95rem",
-                  fontStyle: "italic",
-                  color: "rgba(26,18,10,0.75)",
-                  width: "100%",
-                  transition: "background 0.15s ease",
-                }}
-                onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(26,18,10,0.06)"; }}
-                onMouseLeave={(e) => { e.currentTarget.style.background = c.id === conversationId ? "rgba(26,18,10,0.06)" : "none"; }}
-              >
-                {c.title}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
+      {/* Left sidebar toolbar */}
+      <LeftSidebar
+        conversations={conversations}
+        conversationId={conversationId}
+        onSelectConversation={handleSelectConversation}
+        onDeleteConversation={handleDeleteConversation}
+        onNewConversation={handleNewConversation}
+        onRenameConversation={handleRenameConversation}
+      />
+
+      {/* Main content column */}
+      <div className="flex flex-col flex-1 min-w-0 overflow-hidden" style={{ position: "relative" }}>
 
       {/* Profile overlay — account gate + curated profile with stylist notes */}
       {showProfile && (
@@ -817,64 +865,6 @@ export default function CuratorPage() {
         </Link>
 
         <div className="flex items-center gap-5">
-          {/* New conversation */}
-          {messages.length > 0 && (
-            <button
-              onClick={() => { setMessages([]); setConversationId(null); }}
-              style={{
-                fontFamily: "var(--font-jost)",
-                fontSize: "0.5rem",
-                letterSpacing: "0.24em",
-                textTransform: "uppercase",
-                color: "rgba(26,18,10,0.45)",
-                background: "none",
-                border: "none",
-                paddingBottom: "1px",
-                borderBottom: "1px solid rgba(26,18,10,0.18)",
-                transition: "color 0.2s ease, border-color 0.2s ease",
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.color = "rgba(26,18,10,0.8)";
-                e.currentTarget.style.borderBottomColor = "rgba(26,18,10,0.4)";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.color = "rgba(26,18,10,0.45)";
-                e.currentTarget.style.borderBottomColor = "rgba(26,18,10,0.18)";
-              }}
-            >
-              New
-            </button>
-          )}
-
-          {/* History */}
-          {conversations.length > 0 && (
-            <button
-              onClick={() => setShowHistory((v) => !v)}
-              style={{
-                fontFamily: "var(--font-jost)",
-                fontSize: "0.5rem",
-                letterSpacing: "0.24em",
-                textTransform: "uppercase",
-                color: "rgba(26,18,10,0.45)",
-                background: "none",
-                border: "none",
-                paddingBottom: "1px",
-                borderBottom: "1px solid rgba(26,18,10,0.18)",
-                transition: "color 0.2s ease, border-color 0.2s ease",
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.color = "rgba(26,18,10,0.8)";
-                e.currentTarget.style.borderBottomColor = "rgba(26,18,10,0.4)";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.color = "rgba(26,18,10,0.45)";
-                e.currentTarget.style.borderBottomColor = "rgba(26,18,10,0.18)";
-              }}
-            >
-              History
-            </button>
-          )}
-
           {/* Profile — opens the client's profile (account + stylist notes) */}
           <button
             onClick={() => setShowProfile(true)}
@@ -1237,6 +1227,8 @@ export default function CuratorPage() {
         </div>
 
       </div>
+
+      </div>{/* end main content column */}
 
       {/* Spinner keyframe */}
       <style jsx global>{`
