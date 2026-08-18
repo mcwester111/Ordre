@@ -13,7 +13,7 @@ import { AiNotes, EMPTY_NOTES, saveAiNotes } from "@/lib/account";
 import { loadNotesFromSupabase, saveNotesToSupabase, loadAvatarFromSupabase, saveAvatarToSupabase, saveNameToSupabase } from "@/lib/profile";
 import { createClient } from "@/lib/supabase/client";
 import type { UserProfile } from "@/components/ProfileIntake";
-import { buildProfileDescription } from "@/components/ProfileIntake";
+import { buildProfileDescription, buildProfileTags } from "@/components/ProfileIntake";
 import { SYMBOLS, SymbolSvg } from "@/lib/avatar-symbols";
 
 const INK = "#1A120A";
@@ -180,6 +180,7 @@ export default function ProfilePanel({
   };
 
   const aesthetic = userProfile ? buildProfileDescription(userProfile) : "";
+  const aestheticTags = userProfile ? buildProfileTags(userProfile) : [];
   const firstName = userName?.trim().split(/\s+/)[0] ?? "";
 
   return (
@@ -500,31 +501,60 @@ export default function ProfilePanel({
                   background: "rgba(255,255,255,0.22)",
                 }}
               >
-                <p style={{ fontFamily: "var(--font-jost)", fontSize: "0.8rem", lineHeight: 1.85, color: BODY, margin: 0 }}>
-                  {aesthetic
-                    ? aesthetic.replace(/^Client profile — /, "").replace(/\.$/, "")
-                    : "You haven't completed your aesthetic profile yet."}
-                </p>
-                <button
-                  onClick={onRefineAesthetic}
-                  style={{
-                    marginTop: "0.9rem",
-                    background: "none",
-                    border: "none",
-                    padding: 0,
-                    cursor: "pointer",
-                    fontFamily: "var(--font-jost)",
-                    fontSize: "0.56rem",
-                    fontWeight: 600,
-                    letterSpacing: "0.22em",
-                    textTransform: "uppercase",
-                    color: GOLD,
-                    borderBottom: `1px solid ${GOLD_DIM}`,
-                    paddingBottom: 2,
-                  }}
-                >
-                  {aesthetic ? "Refine aesthetic" : "Complete aesthetic profile"}
-                </button>
+                {aestheticTags.length > 0 ? (
+                  <p style={{ fontFamily: "var(--font-jost)", fontSize: "0.8rem", lineHeight: 1.85, color: BODY, margin: 0 }}>
+                    {aestheticTags.join(", ")}
+                  </p>
+                ) : (
+                  <p style={{ fontFamily: "var(--font-jost)", fontSize: "0.8rem", lineHeight: 1.85, color: MUTED, margin: 0 }}>
+                    {"You haven't completed your aesthetic profile yet."}
+                  </p>
+                )}
+                <div style={{ display: "flex", alignItems: "center", gap: "1.1rem", marginTop: "0.9rem", flexWrap: "wrap" }}>
+                  <button
+                    onClick={onRefineAesthetic}
+                    style={{
+                      background: "none",
+                      border: "none",
+                      padding: 0,
+                      paddingBottom: 2,
+                      cursor: "pointer",
+                      fontFamily: "var(--font-jost)",
+                      fontSize: "0.56rem",
+                      fontWeight: 600,
+                      letterSpacing: "0.22em",
+                      textTransform: "uppercase",
+                      color: GOLD,
+                      borderBottom: `1px solid ${GOLD_DIM}`,
+                    }}
+                  >
+                    {aesthetic ? "Refine aesthetic" : "Complete aesthetic profile"}
+                  </button>
+                  {aesthetic && (
+                    <>
+                      <span style={{ color: GOLD_DIM, fontSize: "0.6rem" }}>·</span>
+                      <button
+                        onClick={onRefineAesthetic}
+                        style={{
+                          background: "none",
+                          border: "none",
+                          padding: 0,
+                          paddingBottom: 2,
+                          cursor: "pointer",
+                          fontFamily: "var(--font-jost)",
+                          fontSize: "0.56rem",
+                          fontWeight: 600,
+                          letterSpacing: "0.22em",
+                          textTransform: "uppercase",
+                          color: MUTED,
+                          borderBottom: `1px solid rgba(26,18,10,0.12)`,
+                        }}
+                      >
+                        Start over
+                      </button>
+                    </>
+                  )}
+                </div>
               </div>
             </section>
 

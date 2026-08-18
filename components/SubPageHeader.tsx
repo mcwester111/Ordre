@@ -101,9 +101,10 @@ export default function SubPageHeader({ darkMode = false }: { darkMode?: boolean
         </nav>
 
         {/* Brand mark — centred */}
-        <div
+        <Link
+          href="/"
           className="absolute flex flex-col items-center"
-          style={{ top: "50%", left: "50%", transform: "translate(-50%, -50%)" }}
+          style={{ top: "50%", left: "50%", transform: "translate(-50%, -50%)", textDecoration: "none" }}
         >
           <Image
             src="/swan-logo.png"
@@ -125,7 +126,7 @@ export default function SubPageHeader({ darkMode = false }: { darkMode?: boolean
               filter: darkMode ? "invert(1) brightness(0.7)" : "none",
             }}
           />
-        </div>
+        </Link>
 
         {/* Auth — top right */}
         <div className="absolute flex items-center" style={{ top: "1.25rem", right: "2rem" }}>

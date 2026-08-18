@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import SubPageHeader from "@/components/SubPageHeader";
 import Footer from "@/components/Footer";
@@ -10,9 +10,20 @@ export default function SignInPage() {
   const router = useRouter();
   const supabase = createClient();
 
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) router.replace("/");
+    });
+  }, []);
+
   const [email, setEmail]       = useState("");
   const [password, setPassword] = useState("");
   const [showPass, setShowPass] = useState(false);
+  const showPassTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [showCreatePass, setShowCreatePass]   = useState(false);
+  const [showCreatePass2, setShowCreatePass2] = useState(false);
+  const showCreatePassTimer  = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const showCreatePass2Timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [status, setStatus]     = useState<"idle" | "loading" | "error">("idle");
   const [errorMsg, setErrorMsg] = useState("");
 
@@ -29,6 +40,7 @@ export default function SignInPage() {
   const [createPass, setCreatePass]     = useState("");
   const [createPass2, setCreatePass2]   = useState("");
   const [createTos, setCreateTos]       = useState(false);
+  const [createAge, setCreateAge]       = useState(false);
   const [createMkt, setCreateMkt]       = useState(false);
   const [createStatus, setCreateStatus] = useState<"idle" | "loading" | "sent">("idle");
   const [createError, setCreateError]   = useState("");
@@ -79,6 +91,10 @@ export default function SignInPage() {
       setCreateError("The passwords do not match.");
       return;
     }
+    if (!createAge) {
+      setCreateError("Please confirm you are 18 or older.");
+      return;
+    }
     if (!createTos) {
       setCreateError("Please accept the Terms and Privacy Policy.");
       return;
@@ -88,7 +104,7 @@ export default function SignInPage() {
       email: createEmail,
       password: createPass,
       options: {
-        data: { name: `${createFirst.trim()} ${createLast.trim()}`, marketing_opt_in: createMkt },
+        data: { name: `${createFirst.trim()} ${createLast.trim()}`, marketing_opt_in: createMkt, tos_agreed_at: new Date().toISOString(), age_confirmed: true },
         emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL ?? window.location.origin}/auth/confirm`,
       },
     });
@@ -122,9 +138,10 @@ export default function SignInPage() {
     display: "block",
     fontFamily: "var(--font-jost)",
     fontWeight: 600,
-    fontSize: "0.42rem",
+    fontSize: "0.5rem",
     letterSpacing: "0.24em",
     textTransform: "uppercase",
+    cursor: "default",
     color: "rgba(200,170,110,0.52)",
     marginBottom: "0.3rem",
     textAlign: "center",
@@ -154,7 +171,11 @@ export default function SignInPage() {
         input#create-last,
         input#create-email,
         input#create-pass,
-        input#create-pass2 { cursor: default !important; caret-color: rgba(200,170,110,0.7); }
+        input#create-pass2 { caret-color: rgba(200,170,110,0.7); }
+        label[for="email"], label[for="password"],
+        label[for="forgot-email"], label[for="create-first"],
+        label[for="create-last"], label[for="create-email"],
+        label[for="create-pass"], label[for="create-pass2"] { cursor: default !important; }
         input#email::selection,
         input#password::selection,
         input#forgot-email::selection,
@@ -165,6 +186,33 @@ export default function SignInPage() {
         input#create-pass2::selection {
           background: rgba(200,170,110,0.28);
           color: rgba(235,220,195,0.92);
+        }
+        input#email:-webkit-autofill,
+        input#password:-webkit-autofill,
+        input#forgot-email:-webkit-autofill,
+        input#create-first:-webkit-autofill,
+        input#create-last:-webkit-autofill,
+        input#create-email:-webkit-autofill,
+        input#create-pass:-webkit-autofill,
+        input#create-pass2:-webkit-autofill,
+        input#email:-webkit-autofill:focus,
+        input#password:-webkit-autofill:focus,
+        input#forgot-email:-webkit-autofill:focus,
+        input#create-first:-webkit-autofill:focus,
+        input#create-last:-webkit-autofill:focus,
+        input#create-email:-webkit-autofill:focus,
+        input#create-pass:-webkit-autofill:focus,
+        input#create-pass2:-webkit-autofill:focus {
+          -webkit-box-shadow: 0 0 0 100px rgba(28,22,14,0.92) inset !important;
+          -webkit-text-fill-color: rgba(235,220,195,0.88) !important;
+          font-family: var(--font-cormorant) !important;
+          font-weight: 600 !important;
+          font-size: 0.88rem !important;
+          letter-spacing: 0.03em !important;
+          border-bottom: 1px solid rgba(200,170,110,0.22) !important;
+          outline: none !important;
+          caret-color: rgba(200,170,110,0.7);
+          transition: background-color 5000s ease-in-out 0s;
         }
       `}</style>
       <SubPageHeader />
@@ -238,11 +286,11 @@ export default function SignInPage() {
 
               {/* Email */}
               <div>
-                <label htmlFor="email" className="cursor-default" style={{
+                <label htmlFor="email" style={{ cursor: "default",
                   display: "block",
                   fontFamily: "var(--font-jost)",
                   fontWeight: 600,
-                  fontSize: "0.44rem",
+                  fontSize: "0.52rem",
                   letterSpacing: "0.26em",
                   textTransform: "uppercase",
                   color: "rgba(200,170,110,0.52)",
@@ -277,11 +325,11 @@ export default function SignInPage() {
 
               {/* Password */}
               <div>
-                <label htmlFor="password" className="cursor-default" style={{
+                <label htmlFor="password" style={{ cursor: "default",
                   display: "block",
                   fontFamily: "var(--font-jost)",
                   fontWeight: 600,
-                  fontSize: "0.44rem",
+                  fontSize: "0.52rem",
                   letterSpacing: "0.26em",
                   textTransform: "uppercase",
                   color: "rgba(200,170,110,0.52)",
@@ -289,28 +337,69 @@ export default function SignInPage() {
                 }}>
                   Password
                 </label>
-                <input
-                  id="password"
-                  type={showPass ? "text" : "password"}
-                  autoComplete="current-password"
-                  value={password}
-                  onChange={e => { setPassword(e.target.value); setStatus("idle"); }}
-                  style={{
-                    width: "100%",
-                    background: "transparent",
-                    border: "none",
-                    borderBottom: "1px solid rgba(200,170,110,0.22)",
-                    padding: "0.35rem 0",
-                    fontFamily: "var(--font-cormorant)",
-                    fontWeight: 600,
-                    textAlign: "center",
-                    fontSize: "0.9rem",
-                    letterSpacing: "0.03em",
-                    color: "rgba(235,220,195,0.88)",
-                    outline: "none",
-                    cursor: "default",
-                  }}
-                />
+                <div style={{ position: "relative" }}>
+                  <input
+                    id="password"
+                    type={showPass ? "text" : "password"}
+                    autoComplete="current-password"
+                    value={password}
+                    onChange={e => { setPassword(e.target.value); setStatus("idle"); }}
+                    style={{
+                      width: "100%",
+                      background: "transparent",
+                      border: "none",
+                      borderBottom: "1px solid rgba(200,170,110,0.22)",
+                      padding: "0.35rem 1.2rem 0.35rem 1.2rem",
+                      fontFamily: "var(--font-cormorant)",
+                      fontWeight: 600,
+                      textAlign: "center",
+                      fontSize: "0.9rem",
+                      letterSpacing: "0.03em",
+                      color: "rgba(235,220,195,0.88)",
+                      outline: "none",
+                      boxSizing: "border-box",
+                    }}
+                  />
+                  <button
+                    type="button"
+                    aria-label={showPass ? "Hide password" : "Show password"}
+                    onClick={() => {
+                      if (showPassTimer.current) clearTimeout(showPassTimer.current);
+                      if (showPass) {
+                        setShowPass(false);
+                      } else {
+                        setShowPass(true);
+                        showPassTimer.current = setTimeout(() => setShowPass(false), 2000);
+                      }
+                    }}
+                    style={{
+                      position: "absolute",
+                      right: 0,
+                      top: "50%",
+                      transform: "translateY(-50%)",
+                      background: "none",
+                      border: "none",
+                      padding: "0.2rem",
+                      cursor: "pointer",
+                      color: showPass ? "rgba(200,170,110,0.65)" : "rgba(200,170,110,0.32)",
+                      transition: "color 0.2s",
+                      lineHeight: 0,
+                    }}
+                  >
+                    {showPass ? (
+                      /* Eye open */
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+                      </svg>
+                    ) : (
+                      /* Eye closed */
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M3.98 8.223A10.477 10.477 0 0 0 1.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.451 10.451 0 0 1 12 4.5c4.756 0 8.773 3.162 10.065 7.498a10.522 10.522 0 0 1-4.293 5.774M6.228 6.228 3 3m3.228 3.228 3.65 3.65m7.894 7.894L21 21m-3.228-3.228-3.65-3.65m0 0a3 3 0 1 0-4.243-4.243m4.242 4.242L9.88 9.88" />
+                      </svg>
+                    )}
+                  </button>
+                </div>
               </div>
 
               {/* Forgot */}
@@ -322,10 +411,10 @@ export default function SignInPage() {
                     background: "none",
                     border: "none",
                     borderBottom: "1px solid rgba(200,170,110,0.25)",
-                    padding: "0.5rem 0.3rem 0.35rem",
+                    padding: "0.5rem 0.3rem 0.02rem",
                     fontFamily: "var(--font-cormorant)",
-                    fontWeight: 600,
-                    fontSize: "0.75rem",
+                    fontWeight: 900,
+                    fontSize: "0.82rem",
                     fontStyle: "italic",
                     color: "rgba(200,170,110,0.42)",
                     textDecoration: "none",
@@ -363,7 +452,7 @@ export default function SignInPage() {
                   padding: "0.65rem 1rem",
                   fontFamily: "var(--font-jost)",
                   fontWeight: 600,
-                  fontSize: "0.46rem",
+                  fontSize: "0.54rem",
                   letterSpacing: "0.3em",
                   textTransform: "uppercase",
                   color: status === "loading" ? "rgba(200,170,110,0.3)" : "rgba(235,220,195,0.78)",
@@ -394,7 +483,7 @@ export default function SignInPage() {
             {/* Footer */}
             <p style={{
               fontFamily: "var(--font-cormorant)",
-              fontWeight: 600,
+              fontWeight: 900,
               fontSize: "0.78rem",
               fontStyle: "italic",
               color: "rgba(200,170,110,0.42)",
@@ -411,9 +500,9 @@ export default function SignInPage() {
                   background: "none",
                   border: "none",
                   borderBottom: "1px solid rgba(200,170,110,0.25)",
-                  padding: "0.5rem 0.3rem 0.35rem",
+                  padding: "0.5rem 0.3rem 0.02rem",
                   fontFamily: "var(--font-cormorant)",
-                  fontWeight: 600,
+                  fontWeight: 900,
                   fontSize: "0.78rem",
                   fontStyle: "italic",
                   color: "rgba(200,170,110,0.62)",
@@ -512,7 +601,7 @@ export default function SignInPage() {
                       display: "block",
                       fontFamily: "var(--font-jost)",
                       fontWeight: 600,
-                      fontSize: "0.44rem",
+                      fontSize: "0.52rem",
                       letterSpacing: "0.26em",
                       textTransform: "uppercase",
                       color: "rgba(200,170,110,0.52)",
@@ -555,7 +644,7 @@ export default function SignInPage() {
                       padding: "0.65rem 1rem",
                       fontFamily: "var(--font-jost)",
                       fontWeight: 600,
-                      fontSize: "0.46rem",
+                      fontSize: "0.54rem",
                       letterSpacing: "0.3em",
                       textTransform: "uppercase",
                       color: forgotStatus === "loading" ? "rgba(200,170,110,0.3)" : "rgba(235,220,195,0.78)",
@@ -724,16 +813,86 @@ export default function SignInPage() {
                   {/* Password */}
                   <div>
                     <label htmlFor="create-pass" style={mLabel}>Password</label>
-                    <input id="create-pass" type="password" autoComplete="new-password"
-                      value={createPass} onChange={e => setCreatePass(e.target.value)} style={mInput} />
+                    <div style={{ position: "relative" }}>
+                      <input id="create-pass" type={showCreatePass ? "text" : "password"} autoComplete="new-password"
+                        value={createPass} onChange={e => setCreatePass(e.target.value)}
+                        style={{ ...mInput, paddingRight: "1.2rem", paddingLeft: "1.2rem", boxSizing: "border-box" }} />
+                      <button type="button" aria-label={showCreatePass ? "Hide password" : "Show password"}
+                        onClick={() => {
+                          if (showCreatePassTimer.current) clearTimeout(showCreatePassTimer.current);
+                          if (showCreatePass) { setShowCreatePass(false); }
+                          else { setShowCreatePass(true); showCreatePassTimer.current = setTimeout(() => setShowCreatePass(false), 2000); }
+                        }}
+                        style={{ position: "absolute", right: 0, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", padding: "0.2rem", cursor: "pointer", color: showCreatePass ? "rgba(200,170,110,0.65)" : "rgba(200,170,110,0.32)", transition: "color 0.2s", lineHeight: 0 }}>
+                        {showCreatePass ? (
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+                          </svg>
+                        ) : (
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M3.98 8.223A10.477 10.477 0 0 0 1.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.451 10.451 0 0 1 12 4.5c4.756 0 8.773 3.162 10.065 7.498a10.522 10.522 0 0 1-4.293 5.774M6.228 6.228 3 3m3.228 3.228 3.65 3.65m7.894 7.894L21 21m-3.228-3.228-3.65-3.65m0 0a3 3 0 1 0-4.243-4.243m4.242 4.242L9.88 9.88" />
+                          </svg>
+                        )}
+                      </button>
+                    </div>
                   </div>
 
                   {/* Confirm password */}
                   <div>
                     <label htmlFor="create-pass2" style={mLabel}>Re-enter Password</label>
-                    <input id="create-pass2" type="password" autoComplete="new-password"
-                      value={createPass2} onChange={e => setCreatePass2(e.target.value)} style={mInput} />
+                    <div style={{ position: "relative" }}>
+                      <input id="create-pass2" type={showCreatePass2 ? "text" : "password"} autoComplete="new-password"
+                        value={createPass2} onChange={e => setCreatePass2(e.target.value)}
+                        style={{ ...mInput, paddingRight: "1.2rem", paddingLeft: "1.2rem", boxSizing: "border-box" }} />
+                      <button type="button" aria-label={showCreatePass2 ? "Hide password" : "Show password"}
+                        onClick={() => {
+                          if (showCreatePass2Timer.current) clearTimeout(showCreatePass2Timer.current);
+                          if (showCreatePass2) { setShowCreatePass2(false); }
+                          else { setShowCreatePass2(true); showCreatePass2Timer.current = setTimeout(() => setShowCreatePass2(false), 2000); }
+                        }}
+                        style={{ position: "absolute", right: 0, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", padding: "0.2rem", cursor: "pointer", color: showCreatePass2 ? "rgba(200,170,110,0.65)" : "rgba(200,170,110,0.32)", transition: "color 0.2s", lineHeight: 0 }}>
+                        {showCreatePass2 ? (
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+                          </svg>
+                        ) : (
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M3.98 8.223A10.477 10.477 0 0 0 1.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.451 10.451 0 0 1 12 4.5c4.756 0 8.773 3.162 10.065 7.498a10.522 10.522 0 0 1-4.293 5.774M6.228 6.228 3 3m3.228 3.228 3.65 3.65m7.894 7.894L21 21m-3.228-3.228-3.65-3.65m0 0a3 3 0 1 0-4.243-4.243m4.242 4.242L9.88 9.88" />
+                          </svg>
+                        )}
+                      </button>
+                    </div>
                   </div>
+
+                  {/* Age confirmation */}
+                  <label htmlFor="create-age" style={{ display: "flex", alignItems: "flex-start", gap: "0.55rem", textAlign: "left", marginTop: "0.3rem", cursor: "pointer" }}>
+                    <button
+                      id="create-age"
+                      type="button"
+                      role="checkbox"
+                      aria-checked={createAge}
+                      onClick={() => setCreateAge(v => !v)}
+                      style={{
+                        flexShrink: 0,
+                        width: "13px", height: "13px",
+                        marginTop: "2px",
+                        border: `1px solid rgba(200,170,110,${createAge ? 0.7 : 0.35})`,
+                        background: createAge ? "rgba(200,170,110,0.15)" : "transparent",
+                        color: "rgba(200,170,110,0.9)",
+                        fontSize: "0.55rem",
+                        lineHeight: 1,
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        transition: "border-color 0.2s ease, background 0.2s ease",
+                      }}
+                    >
+                      {createAge ? "✓" : ""}
+                    </button>
+                    <span style={{ fontFamily: "var(--font-jost)", fontSize: "0.5rem", letterSpacing: "0.04em", lineHeight: 1.7, color: "rgba(210,195,168,0.6)" }}>
+                      I confirm I am 18 years of age or older.
+                    </span>
+                  </label>
 
                   {/* Terms + Privacy consent */}
                   <label htmlFor="create-tos" style={{ display: "flex", alignItems: "flex-start", gap: "0.55rem", textAlign: "left", marginTop: "0.3rem", cursor: "pointer" }}>
@@ -790,7 +949,7 @@ export default function SignInPage() {
                       {createMkt ? "✓" : ""}
                     </button>
                     <span style={{ fontFamily: "var(--font-jost)", fontSize: "0.5rem", letterSpacing: "0.04em", lineHeight: 1.7, color: "rgba(210,195,168,0.6)" }}>
-                      Send me Ordre dispatches — new curations and private invitations.
+                      Send me occasional updates from Ordre.
                     </span>
                   </label>
 
@@ -820,7 +979,7 @@ export default function SignInPage() {
                       padding: "0.65rem 1rem",
                       fontFamily: "var(--font-jost)",
                       fontWeight: 600,
-                      fontSize: "0.46rem",
+                      fontSize: "0.54rem",
                       letterSpacing: "0.3em",
                       textTransform: "uppercase",
                       color: createStatus === "loading" ? "rgba(200,170,110,0.3)" : "rgba(235,220,195,0.78)",

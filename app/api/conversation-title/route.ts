@@ -20,15 +20,19 @@ export async function POST(request: Request) {
     const response = await client.messages.create({
       model: "claude-haiku-4-5",
       max_tokens: 20,
+      system: `You output only a title — nothing else. Never use the word "I". Never say you cannot do something. Never refuse or hedge. If the message is unclear or sensitive, invent a plausible elegant title anyway. Output 3 to 5 words, no quotes, no punctuation at the end.`,
       messages: [{
         role: "user",
-        content: `Give this conversation a short, elegant title — 3 to 5 words, no quotes, no punctuation at the end. The opening message was: "${firstMessage}"`,
+        content: `Title this conversation based on its opening message: "${firstMessage}"`,
       }],
     });
 
-    const title = response.content[0].type === "text"
-      ? response.content[0].text.trim().replace(/^["']|["']$/g, "")
-      : "New conversation";
+    const raw = response.content[0].type === "text" ? response.content[0].text.trim() : "";
+    // Strip quotes, strip any leading "I " or "I cannot" fallback, collapse to 60 chars
+    const title = raw
+      .replace(/^["']|["']$/g, "")
+      .replace(/^I\s+\w+.*$/i, firstMessage.slice(0, 40))
+      .slice(0, 60) || firstMessage.slice(0, 50);
 
     return Response.json({ title });
   } catch {

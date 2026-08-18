@@ -26,6 +26,7 @@ export type Block =
 export type Section = {
   title: string;
   blocks: Block[];
+  id?: string;
 };
 
 export type LegalContent = {
@@ -189,7 +190,7 @@ export default function LegalDocument({ content }: { content: LegalContent }) {
 
       {/* Numbered sections */}
       {content.sections.map((s, i) => (
-        <section key={i} style={{ marginBottom: "2.5rem" }}>
+        <section key={i} id={s.id} style={{ marginBottom: "2.5rem" }}>
           <div
             style={{
               display: "flex",

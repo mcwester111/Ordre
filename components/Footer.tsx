@@ -33,6 +33,7 @@ export default function Footer() {
         <nav style={{ display: "flex", alignItems: "center", gap: "1.75rem" }}>
           <a href="/privacy"  style={LINK}>Privacy Policy</a>
           <a href="/terms"    style={LINK}>Terms of Service</a>
+          <a href="/privacy#do-not-sell" style={LINK}>Do Not Sell My Info</a>
           <button
             onClick={() => window.dispatchEvent(new Event("ordre:cookie-preferences"))}
             style={{ ...LINK, background: "none", border: "none" }}

@@ -135,6 +135,9 @@ const PRIVACY: LegalContent = {
         {
           p: `We use reasonable technical and organizational measures designed to protect information against unauthorized access, loss, misuse, and alteration — including transport encryption, input validation and file-type restrictions on uploads, and rate limiting. **No method of transmission or storage is completely secure**, however, and we cannot guarantee absolute security. You are responsible for the security of the device and browser you use to access the AI Stylist.`,
         },
+        {
+          p: `In the event of a data breach that affects your personal information, we will notify affected users and relevant authorities as required by applicable law — including within 72 hours where required under GDPR, and within applicable timeframes under U.S. state breach-notification laws. Notification will be sent to the email address associated with your account.`,
+        },
       ],
     },
     {
@@ -169,6 +172,7 @@ const PRIVACY: LegalContent = {
       ],
     },
     {
+      id: `do-not-sell`,
       title: `U.S. State Privacy Rights`,
       blocks: [
         {

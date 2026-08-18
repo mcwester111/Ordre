@@ -65,6 +65,15 @@ type ApiMessage = {
   content: string | ApiContent[];
 };
 
+// ── Welcome flag — set once after the very first assistant response ───────
+const WELCOMED_KEY = "ordre.welcomed.v1";
+function loadWelcomed(): boolean {
+  try { return localStorage.getItem(WELCOMED_KEY) === "true"; } catch { return false; }
+}
+function saveWelcomed() {
+  try { localStorage.setItem(WELCOMED_KEY, "true"); } catch {}
+}
+
 // ── Conversation cache (localStorage write-ahead buffer) ──────────────────
 // Keeps the active conversation alive across hard refreshes. Supabase writes
 // are async and can race a quick refresh; localStorage is synchronous and
@@ -121,6 +130,88 @@ async function processImage(file: File): Promise<MessageImage> {
     img.onerror = reject;
     img.src = objectUrl;
   });
+}
+
+// Resize a dataUrl to a small thumbnail for wardrobe context injection
+async function resizeDataUrlToBase64(
+  dataUrl: string,
+  maxDim = 260,
+  quality = 0.72,
+): Promise<{ base64: string; mediaType: string } | null> {
+  try {
+    return await new Promise((resolve, reject) => {
+      const img = new window.Image();
+      img.onload = () => {
+        const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+        const w = Math.round(img.width * scale);
+        const h = Math.round(img.height * scale);
+        const canvas = document.createElement("canvas");
+        canvas.width = w; canvas.height = h;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) { reject(new Error("no ctx")); return; }
+        ctx.drawImage(img, 0, 0, w, h);
+        const out = canvas.toDataURL("image/jpeg", quality);
+        resolve({ base64: out.split(",")[1], mediaType: "image/jpeg" });
+      };
+      img.onerror = reject;
+      img.src = dataUrl;
+    });
+  } catch {
+    return null;
+  }
+}
+
+// Build visual wardrobe + moodboard context to inject before the real conversation
+async function buildWardrobeContext(): Promise<ApiContent[] | null> {
+  const content: ApiContent[] = [];
+
+  // ── Closet ──────────────────────────────────────────────────────────────
+  try {
+    const raw = localStorage.getItem("ordre.closet.v1");
+    if (raw) {
+      const cubbies = JSON.parse(raw) as { id: string; label: string; items: { id: string; dataUrl: string }[] }[];
+      const labeled = cubbies.filter(c => c.label.trim() && c.items.length > 0);
+      if (labeled.length > 0) {
+        content.push({ type: "text", text: "Here is my current wardrobe, organised by category in my Ordre closet:" });
+        for (const cubby of labeled.slice(0, 10)) {
+          content.push({ type: "text", text: `Category: ${cubby.label.toUpperCase()} — ${cubby.items.length} item${cubby.items.length !== 1 ? "s" : ""}` });
+          for (const item of cubby.items.slice(0, 5)) {
+            const thumb = await resizeDataUrlToBase64(item.dataUrl);
+            if (thumb) content.push({ type: "image", source: { type: "base64", media_type: thumb.mediaType, data: thumb.base64 } });
+          }
+        }
+      }
+    }
+  } catch { /* ignore */ }
+
+  // ── Moodboard images ────────────────────────────────────────────────────
+  try {
+    const raw = localStorage.getItem("ordre.moodboard.v1");
+    if (raw) {
+      const images = JSON.parse(raw) as { id: string; dataUrl: string }[];
+      if (images.length > 0) {
+        content.push({ type: "text", text: `I also have ${images.length} image${images.length !== 1 ? "s" : ""} saved to my moodboard:` });
+        for (const img of images.slice(0, 8)) {
+          const thumb = await resizeDataUrlToBase64(img.dataUrl);
+          if (thumb) content.push({ type: "image", source: { type: "base64", media_type: thumb.mediaType, data: thumb.base64 } });
+        }
+      }
+    }
+  } catch { /* ignore */ }
+
+  // ── Canvas text annotations ─────────────────────────────────────────────
+  try {
+    const raw = localStorage.getItem("ordre.canvas.v1");
+    if (raw) {
+      const canvases = JSON.parse(raw) as { id: string; items: { type?: string; text?: string }[] }[];
+      const texts = canvases.flatMap(c => c.items.filter(i => i.type === "text" && i.text?.trim()).map(i => i.text!.trim()));
+      if (texts.length > 0) {
+        content.push({ type: "text", text: `Text notes on my moodboard canvas:\n${texts.map(t => `– ${t}`).join("\n")}` });
+      }
+    }
+  } catch { /* ignore */ }
+
+  return content.length > 0 ? content : null;
 }
 
 function buildApiMessages(displayMessages: DisplayMessage[]): ApiMessage[] {
@@ -252,14 +343,24 @@ function UserMessage({ message }: { message: DisplayMessage }) {
         </div>
       )}
 
-      {/* Text — no box, no label; the user's own words, right-aligned */}
+      {/* Text bubble — right-aligned, faint warm background to distinguish from AI */}
       {message.text.trim() && (
-        <p
-          className="max-w-md text-right text-[15px] leading-7"
-          style={{ color: "rgba(26,18,10,0.92)", letterSpacing: "0", fontFamily: "var(--font-inter)" }}
+        <div
+          style={{
+            background: "rgba(228,220,206,0.52)",
+            border: "1px solid rgba(26,18,10,0.07)",
+            padding: "10px 14px",
+            borderRadius: "16px",
+            maxWidth: "min(420px, 85%)",
+          }}
         >
-          {message.text}
-        </p>
+          <p
+            className="text-[15px] leading-7"
+            style={{ color: "rgba(26,18,10,0.92)", letterSpacing: "0", fontFamily: "var(--font-inter)" }}
+          >
+            {message.text}
+          </p>
+        </div>
       )}
     </div>
   );
@@ -308,6 +409,8 @@ export default function CuratorPage() {
   const [plusOpen, setPlusOpen] = useState(false);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [conversations, setConversations] = useState<ConversationRow[]>([]);
+  const [welcomed, setWelcomed] = useState(false);
+  const [inputExpanded, setInputExpanded] = useState(false);
   // Gate the first paint until we've checked storage, so returning clients
   // don't see a flash of the intake before it's skipped.
   const [hydrated, setHydrated] = useState(false);
@@ -348,12 +451,18 @@ export default function CuratorPage() {
         }
       });
 
+      // Check welcomed flag before loading conversations
+      if (loadWelcomed()) setWelcomed(true);
+
       // Load conversation history. Supabase is authoritative; localStorage cache
       // covers the gap when a refresh races the async DB writes.
       const cached = loadConvCache();
       const convos = await listConversations();
 
       if (convos.length > 0) {
+        // They've had prior conversations — they've already seen the welcome
+        setWelcomed(true);
+        saveWelcomed();
         const cachedMissing = cached && !convos.find(c => c.id === cached.id);
         if (cachedMissing && cached!.messages.length > 0) {
           // The cached conversation hasn't made it to Supabase yet — show it
@@ -619,6 +728,7 @@ export default function CuratorPage() {
     setInput("");
     setPendingImages([]);
     setPendingDocs([]);
+    setInputExpanded(false);
     setIsLoading(true);
 
     // Create conversation in DB before saving any messages (foreign key requirement).
@@ -648,11 +758,22 @@ export default function CuratorPage() {
     try {
       const apiMessages = buildApiMessages(newMessages);
 
+      // Prepend wardrobe + moodboard context so the AI can see the actual items
+      const wardrobeContext = await buildWardrobeContext();
+      const contextMessages: ApiMessage[] = wardrobeContext
+        ? [
+            { role: "user", content: wardrobeContext },
+            { role: "assistant", content: "I can see your wardrobe and moodboard. I'll draw on these throughout our conversation — referencing the specific pieces and visual references you've stored." },
+          ]
+        : [];
+      const messagesWithContext = [...contextMessages, ...apiMessages];
+
       const response = await fetch("/api/curator", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          messages: apiMessages,
+          messages: messagesWithContext,
+          welcomed,
           profile: [
             userProfile ? buildProfileDescription(userProfile) : "",
             buildNotesDescription(aiNotes),
@@ -710,6 +831,13 @@ export default function CuratorPage() {
       if (activeConversationId && streamedText) {
         saveMessage(activeConversationId, "assistant", streamedText);
 
+        // After the very first-ever response, mark the client as welcomed
+        // so no future conversation opens with the greeting again.
+        if (!welcomed) {
+          setWelcomed(true);
+          saveWelcomed();
+        }
+
         // Generate a proper title after the first exchange
         if (messages.length === 0 && text) {
           fetch("/api/conversation-title", {
@@ -743,7 +871,7 @@ export default function CuratorPage() {
       setIsLoading(false);
       textareaRef.current?.focus();
     }
-  }, [input, pendingImages, pendingDocs, messages, isLoading, userProfile, aiNotes, clientName, conversationId]);
+  }, [input, pendingImages, pendingDocs, messages, isLoading, userProfile, aiNotes, clientName, conversationId, welcomed]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -758,10 +886,11 @@ export default function CuratorPage() {
   const handleTextareaInput = useCallback(
     (e: React.ChangeEvent<HTMLTextAreaElement>) => {
       setInput(e.target.value);
-      // Auto-resize
       const el = e.target;
       el.style.height = "auto";
-      el.style.height = Math.min(el.scrollHeight, 160) + "px";
+      const newHeight = Math.min(el.scrollHeight, 160);
+      el.style.height = newHeight + "px";
+      setInputExpanded(newHeight > 32);
     },
     []
   );
@@ -778,7 +907,15 @@ export default function CuratorPage() {
     if (conversationId === id) { setConversationId(null); setMessages([]); }
   };
 
-  const handleNewConversation = () => { setMessages([]); setConversationId(null); };
+  const handleNewConversation = () => {
+    clearConvCache();
+    setMessages([]);
+    setConversationId(null);
+    // Refresh conversation list so any pending title updates are reflected
+    listConversations().then(updated => {
+      if (updated.length > 0) setConversations(updated);
+    }).catch(() => {});
+  };
 
   const handleRenameConversation = async (id: string, title: string) => {
     await updateConversationTitle(id, title);
@@ -1067,11 +1204,13 @@ export default function CuratorPage() {
           <div
             className="flex items-center gap-2"
             style={{
-              borderRadius: "999px",
+              borderRadius: inputExpanded ? "18px" : "999px",
               padding: "7px 8px 7px 6px",
               background: "rgba(244,237,224,0.95)",
               border: "1px solid rgba(26,18,10,0.22)",
               boxShadow: "0 6px 20px -14px rgba(40,28,12,0.28)",
+              transition: "border-radius 0.15s ease",
+              alignItems: inputExpanded ? "flex-end" : "center",
             }}
           >
               {/* Attach menu (+) */}

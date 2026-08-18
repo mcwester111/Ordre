@@ -334,19 +334,54 @@ export default function LandingPage() {
               />
             </div>
           </Link>
-          <a href="/sign-in" style={{
-            marginTop: "0.65rem",
-            fontFamily: "var(--font-jost)",
-            fontSize: "0.5rem",
-            letterSpacing: "0.22em",
-            textTransform: "uppercase",
-            color: "rgba(90,60,25,0.65)",
-            textDecoration: "none",
-            borderBottom: "1px solid rgba(90,60,25,0.35)",
-            padding: "0.6rem 0.3rem 0.35rem",
-          }}>
-            Already a client? Sign in
-          </a>
+          {userName ? (
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "0.5rem", marginTop: "0.65rem" }}>
+              <span style={{
+                fontFamily: "var(--font-jost)",
+                fontSize: "0.5rem",
+                letterSpacing: "0.22em",
+                textTransform: "uppercase",
+                color: "rgba(90,60,25,0.88)",
+                display: "inline-block",
+              }}>
+                Signed in as{" "}
+                <a href="/curator" style={{
+                  fontWeight: 600,
+                  borderBottom: "1px solid rgba(90,60,25,0.65)",
+                  paddingBottom: "0.02rem",
+                  color: "inherit",
+                  textDecoration: "none",
+                }}>
+                  {userName.split(" ")[0]}
+                </a>
+              </span>
+              <a href="/sign-out" style={{
+                fontFamily: "var(--font-jost)",
+                fontSize: "0.5rem",
+                letterSpacing: "0.22em",
+                textTransform: "uppercase",
+                color: "rgba(90,60,25,0.88)",
+                textDecoration: "none",
+                padding: "0 0.3rem 0.02rem",
+              }}>
+                Sign out
+              </a>
+            </div>
+          ) : (
+            <a href="/sign-in" style={{
+              marginTop: "0.65rem",
+              fontFamily: "var(--font-jost)",
+              fontSize: "0.5rem",
+              letterSpacing: "0.22em",
+              textTransform: "uppercase",
+              color: "rgba(90,60,25,0.88)",
+              textDecoration: "none",
+              borderBottom: "1px solid rgba(90,60,25,0.65)",
+              padding: "0.6rem 0.3rem 0.35rem",
+            }}>
+              Already a client? Sign in
+            </a>
+          )}
         </div>
       </div>
       </div>
