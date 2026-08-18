@@ -88,7 +88,7 @@ export default function SignInPage() {
       email: createEmail,
       password: createPass,
       options: {
-        data: { name: `${createFirst.trim()} ${createLast.trim()}` },
+        data: { name: `${createFirst.trim()} ${createLast.trim()}`, marketing_opt_in: createMkt },
         emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL ?? window.location.origin}/auth/confirm`,
       },
     });
@@ -322,14 +322,14 @@ export default function SignInPage() {
                     background: "none",
                     border: "none",
                     borderBottom: "1px solid rgba(200,170,110,0.25)",
-                    padding: 0,
-                    paddingBottom: "1px",
+                    padding: "0.5rem 0.3rem 0.35rem",
                     fontFamily: "var(--font-cormorant)",
                     fontWeight: 600,
                     fontSize: "0.75rem",
                     fontStyle: "italic",
                     color: "rgba(200,170,110,0.42)",
                     textDecoration: "none",
+                    cursor: "pointer",
                   }}
                 >
                   Forgot password?
@@ -411,14 +411,14 @@ export default function SignInPage() {
                   background: "none",
                   border: "none",
                   borderBottom: "1px solid rgba(200,170,110,0.25)",
-                  padding: 0,
-                  paddingBottom: "1px",
+                  padding: "0.5rem 0.3rem 0.35rem",
                   fontFamily: "var(--font-cormorant)",
                   fontWeight: 600,
                   fontSize: "0.78rem",
                   fontStyle: "italic",
                   color: "rgba(200,170,110,0.62)",
                   letterSpacing: "0.03em",
+                  cursor: "pointer",
                 }}
               >
                 Create an account
@@ -481,7 +481,7 @@ export default function SignInPage() {
                   fontSize: "1rem",
                   color: "rgba(200,170,110,0.35)",
                   lineHeight: 1,
-                  padding: "2px 4px",
+                  padding: "0.65rem 0.75rem",
                   transition: "color 0.2s ease",
                 }}
                 onMouseEnter={e => (e.currentTarget.style.color = "rgba(200,170,110,0.75)")}
@@ -636,7 +636,7 @@ export default function SignInPage() {
                   fontSize: "1rem",
                   color: "rgba(200,170,110,0.35)",
                   lineHeight: 1,
-                  padding: "2px 4px",
+                  padding: "0.65rem 0.75rem",
                   transition: "color 0.2s ease",
                   zIndex: 2,
                 }}

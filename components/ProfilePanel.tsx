@@ -10,11 +10,11 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AiNotes, EMPTY_NOTES, saveAiNotes } from "@/lib/account";
-import { loadNotesFromSupabase, saveNotesToSupabase, loadAvatarFromSupabase, saveAvatarToSupabase } from "@/lib/profile";
+import { loadNotesFromSupabase, saveNotesToSupabase, loadAvatarFromSupabase, saveAvatarToSupabase, saveNameToSupabase } from "@/lib/profile";
 import { createClient } from "@/lib/supabase/client";
 import type { UserProfile } from "@/components/ProfileIntake";
 import { buildProfileDescription } from "@/components/ProfileIntake";
-import { SYMBOLS, SymbolSvg, type AvatarLabel } from "@/lib/avatar-symbols";
+import { SYMBOLS, SymbolSvg } from "@/lib/avatar-symbols";
 
 const INK = "#1A120A";
 const BODY = "rgba(26,18,10,0.74)";
@@ -34,6 +34,28 @@ const LABEL: React.CSSProperties = {
   marginBottom: "0.5rem",
 };
 
+
+const SUBLABEL: React.CSSProperties = {
+  fontFamily: "var(--font-jost)",
+  fontSize: "0.48rem",
+  fontWeight: 600,
+  letterSpacing: "0.18em",
+  textTransform: "uppercase",
+  color: MUTED,
+};
+
+const NAME_INPUT_STYLE: React.CSSProperties = {
+  width: "100%",
+  background: "rgba(255,255,255,0.35)",
+  border: `1px solid ${LINE}`,
+  borderRadius: 9,
+  padding: "0.6rem 0.75rem",
+  fontFamily: "var(--font-cormorant)",
+  fontSize: "1rem",
+  color: INK,
+  outline: "none",
+  boxSizing: "border-box",
+};
 
 const FIELD_BASE: React.CSSProperties = {
   width: "100%",
@@ -67,11 +89,13 @@ export default function ProfilePanel({
   onClose,
   onRefineAesthetic,
   onNotesChange,
+  onAvatarChange,
 }: {
   userProfile: UserProfile | null;
   onClose: () => void;
   onRefineAesthetic: () => void;
   onNotesChange: (notes: AiNotes) => void;
+  onAvatarChange?: (symbol: string, label: string) => void;
 }) {
   const router = useRouter();
   const [loaded, setLoaded] = useState(false);
@@ -79,7 +103,9 @@ export default function ProfilePanel({
   const [notes, setNotes] = useState<AiNotes>(EMPTY_NOTES);
   const [savedFlash, setSavedFlash] = useState(false);
   const [avatarSymbol, setAvatarSymbol] = useState<string>("none");
-  const [avatarLabel, setAvatarLabel] = useState<AvatarLabel>("initial");
+  const [markLabel, setMarkLabel] = useState<string>("");
+  const [editFirst, setEditFirst] = useState<string>("");
+  const [editLast, setEditLast] = useState<string>("");
   const [markExpanded, setMarkExpanded] = useState(true);
 
   const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -89,14 +115,27 @@ export default function ProfilePanel({
       const supabase = createClient();
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
-        setUserName(user.user_metadata?.name ?? user.email ?? null);
+        const name = user.user_metadata?.name ?? user.email ?? null;
+        setUserName(name);
+        const parts = name?.trim().split(/\s+/) ?? [];
+        setEditFirst(parts[0] ?? "");
+        setEditLast(parts.slice(1).join(" "));
         const fromSupabase = await loadNotesFromSupabase();
         if (fromSupabase) setNotes(fromSupabase);
         const avatar = await loadAvatarFromSupabase();
+        const defaultInitial = (name?.trim().split(/\s+/)[0] ?? "").charAt(0).toUpperCase();
         if (avatar) {
           setAvatarSymbol(avatar.symbol);
-          setAvatarLabel(avatar.label as AvatarLabel);
+          // If stored label is one of the old enum values, convert to a sensible default
+          const stored = avatar.label;
+          setMarkLabel(
+            stored === "initial" || stored === "" ? (defaultInitial ? defaultInitial + "." : "") :
+            stored === "name" || stored === "none" ? (defaultInitial ? defaultInitial + "." : "") :
+            stored
+          );
           if (avatar.symbol !== "none") setMarkExpanded(false);
+        } else {
+          setMarkLabel(defaultInitial ? defaultInitial + "." : "");
         }
       }
       setLoaded(true);
@@ -124,8 +163,9 @@ export default function ProfilePanel({
     flashTimer.current = setTimeout(() => setSavedFlash(false), 1800);
   };
 
-  const persistAvatar = (symbol: string, label: AvatarLabel) => {
+  const persistAvatar = (symbol: string, label: string) => {
     saveAvatarToSupabase({ symbol, label });
+    onAvatarChange?.(symbol, label);
   };
 
   const updateField = (key: keyof AiNotes, value: string) =>
@@ -176,7 +216,7 @@ export default function ProfilePanel({
           lineHeight: 1,
           color: MUTED,
           cursor: "pointer",
-          padding: "4px 8px",
+          padding: "0.65rem 0.75rem",
           transition: "color 0.2s ease",
         }}
         onMouseEnter={(e) => (e.currentTarget.style.color = INK)}
@@ -255,6 +295,37 @@ export default function ProfilePanel({
               {firstName ? `Welcome, ${firstName}.` : "Welcome."}
             </p>
 
+            {/* ── Name ── */}
+            <section style={{ marginBottom: "2.6rem" }}>
+              <h2 style={LABEL}>Your Name</h2>
+              <div style={{ display: "flex", gap: "0.6rem" }}>
+                <input
+                  type="text"
+                  value={editFirst}
+                  placeholder="First"
+                  onChange={e => setEditFirst(e.target.value)}
+                  onBlur={() => {
+                    const full = `${editFirst.trim()} ${editLast.trim()}`.trim();
+                    setUserName(full || null);
+                    saveNameToSupabase(editFirst, editLast);
+                  }}
+                  style={{ ...NAME_INPUT_STYLE, flex: 1 }}
+                />
+                <input
+                  type="text"
+                  value={editLast}
+                  placeholder="Last"
+                  onChange={e => setEditLast(e.target.value)}
+                  onBlur={() => {
+                    const full = `${editFirst.trim()} ${editLast.trim()}`.trim();
+                    setUserName(full || null);
+                    saveNameToSupabase(editFirst, editLast);
+                  }}
+                  style={{ ...NAME_INPUT_STYLE, flex: 1 }}
+                />
+              </div>
+            </section>
+
             {/* ── Your Mark ── */}
             <section style={{ marginBottom: "2.6rem" }}>
               <h2 style={{ ...LABEL, color: INK, fontSize: "0.6rem", letterSpacing: "0.16em", marginBottom: "1.2rem" }}>
@@ -265,11 +336,7 @@ export default function ProfilePanel({
                 /* Collapsed: single button showing the current mark */
                 (() => {
                   const sym = SYMBOLS.find(s => s.id === avatarSymbol)!;
-                  const stampLabel = avatarLabel === "name"
-                    ? firstName
-                    : avatarLabel === "initial"
-                    ? firstName.charAt(0).toUpperCase() + "."
-                    : null;
+                  const stampLabel = markLabel || null;
                   return (
                     <button
                       onClick={() => setMarkExpanded(true)}
@@ -323,11 +390,7 @@ export default function ProfilePanel({
                   {/* Current stamp */}
                   {(() => {
                     const sym = SYMBOLS.find(s => s.id === avatarSymbol);
-                    const stampLabel = avatarLabel === "name"
-                      ? firstName
-                      : avatarLabel === "initial"
-                      ? firstName.charAt(0).toUpperCase() + "."
-                      : null;
+                    const stampLabel = markLabel || null;
                     return (
                       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", marginBottom: "1.2rem" }}>
                         <div style={{
@@ -366,13 +429,16 @@ export default function ProfilePanel({
                           onClick={() => {
                             const next = selected ? "none" : sym.id;
                             setAvatarSymbol(next);
-                            persistAvatar(next, avatarLabel);
+                            const defaultInitial = firstName.charAt(0).toUpperCase();
+                            const label = markLabel || (defaultInitial ? `${defaultInitial}.` : "");
+                            if (label !== markLabel) setMarkLabel(label);
+                            persistAvatar(next, label);
                             if (next !== "none") setMarkExpanded(false);
                           }}
                           style={{
                             flexShrink: 0,
-                            width: 44,
-                            height: 44,
+                            width: 54,
+                            height: 54,
                             borderRadius: "50%",
                             display: "flex",
                             alignItems: "center",
@@ -384,39 +450,40 @@ export default function ProfilePanel({
                             padding: 0,
                           }}
                         >
-                          <SymbolSvg symbol={sym} size={22} color={selected ? GOLD : MUTED} />
+                          <SymbolSvg symbol={sym} size={30} color={selected ? GOLD : MUTED} />
                         </button>
                       );
                     })}
                   </div>
 
-                  {/* Label toggle */}
-                  <div style={{ display: "flex", gap: "1.2rem", justifyContent: "center", marginTop: "0.9rem" }}>
-                    {(["name", "initial", "none"] as AvatarLabel[]).map(opt => (
-                      <button
-                        key={opt}
-                        onClick={() => {
-                          setAvatarLabel(opt);
-                          persistAvatar(avatarSymbol, opt);
-                        }}
-                        style={{
-                          background: "none",
-                          border: "none",
-                          padding: "0 0 2px",
-                          fontFamily: "var(--font-jost)",
-                          fontSize: "0.5rem",
-                          fontWeight: 600,
-                          letterSpacing: "0.18em",
-                          textTransform: "uppercase",
-                          color: avatarLabel === opt ? INK : MUTED,
-                          borderBottom: `1px solid ${avatarLabel === opt ? GOLD_DIM : "transparent"}`,
-                          cursor: "pointer",
-                          transition: "color 0.18s",
-                        }}
-                      >
-                        {opt === "name" ? "Full Name" : opt === "initial" ? "Initial" : "No Label"}
-                      </button>
-                    ))}
+                  {/* Mark label input */}
+                  <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "0.35rem", marginTop: "0.9rem" }}>
+                    <label style={{ fontFamily: "var(--font-jost)", fontSize: "0.48rem", fontWeight: 600, letterSpacing: "0.18em", textTransform: "uppercase", color: MUTED }}>
+                      Your initials
+                    </label>
+                    <input
+                      type="text"
+                      value={markLabel}
+                      onChange={e => {
+                        setMarkLabel(e.target.value);
+                        persistAvatar(avatarSymbol, e.target.value);
+                      }}
+                      placeholder={firstName ? `${firstName.charAt(0).toUpperCase()}.` : "M.W."}
+                      maxLength={5}
+                      style={{
+                        fontFamily: "var(--font-cormorant)",
+                        fontSize: "0.9rem",
+                        fontStyle: "italic",
+                        color: INK,
+                        background: "rgba(255,255,255,0.55)",
+                        border: `1px solid ${LINE}`,
+                        borderRadius: "4px",
+                        outline: "none",
+                        textAlign: "center",
+                        width: "140px",
+                        padding: "5px 8px",
+                      }}
+                    />
                   </div>
                 </>
               )}
@@ -471,21 +538,6 @@ export default function ProfilePanel({
 
 
               <div style={{ display: "flex", flexDirection: "column", gap: "1.4rem" }}>
-                {/* Your Name + Nickname */}
-                <div>
-                  <label htmlFor="note-preferredName" style={{ ...LABEL, color: INK, fontSize: "0.6rem", letterSpacing: "0.16em" }}>
-                    Your Name
-                  </label>
-                  <input
-                    id="note-preferredName"
-                    value={notes.preferredName}
-                    placeholder="Your full name"
-                    onChange={(e) => updateField("preferredName", e.target.value)}
-                    onBlur={() => persist(notes)}
-                    style={FIELD_BASE as React.CSSProperties}
-                  />
-                </div>
-
                 <div>
                   <label htmlFor="note-nickname" style={{ ...LABEL, color: INK, fontSize: "0.6rem", letterSpacing: "0.16em" }}>
                     Nickname

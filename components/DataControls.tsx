@@ -104,7 +104,9 @@ export default function DataControls() {
             color: "rgba(100,65,15,0.8)",
           }}
         >
-          Your saved profile has been removed from this browser.
+          {isSignedIn
+            ? "Your account and all associated data have been permanently deleted."
+            : "Your saved profile has been removed from this browser."}
         </p>
       ) : !confirming ? (
         <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem", alignItems: "flex-start" }}>

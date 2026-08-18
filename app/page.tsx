@@ -10,7 +10,7 @@ import SplashScreen from "@/components/SplashScreen";
 import ConfirmedModal from "@/components/ConfirmedModal";
 import ProfilePanel from "@/components/ProfilePanel";
 import { SYMBOLS, SymbolSvg } from "@/lib/avatar-symbols";
-import { loadAvatarFromSupabase } from "@/lib/profile";
+import { loadAvatarFromSupabase, loadAvatarFromCache } from "@/lib/profile";
 import { createClient } from "@/lib/supabase/client";
 
 
@@ -23,8 +23,8 @@ export default function LandingPage() {
   const router = useRouter();
   const [userName, setUserName] = useState<string | null>(null);
   const [showProfile, setShowProfile] = useState(false);
-  const [avatarSymbolId, setAvatarSymbolId] = useState<string>("none");
-  const [avatarLabel, setAvatarLabel] = useState<"name" | "initial" | "none">("initial");
+  const [avatarSymbolId, setAvatarSymbolId] = useState<string>(() => loadAvatarFromCache()?.symbol ?? "none");
+  const [avatarLabel, setAvatarLabel] = useState<string>(() => loadAvatarFromCache()?.label ?? "");
 
   useEffect(() => {
     const supabase = createClient();
@@ -32,13 +32,18 @@ export default function LandingPage() {
       setUserName(user?.user_metadata?.name ?? user?.email ?? null);
       if (user) {
         loadAvatarFromSupabase().then(av => {
-          if (av) { setAvatarSymbolId(av.symbol); setAvatarLabel(av.label as "name" | "initial" | "none"); }
+          if (av) { setAvatarSymbolId(av.symbol); setAvatarLabel(av.label); }
         });
       }
     });
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       const user = session?.user;
       setUserName(user?.user_metadata?.name ?? user?.email ?? null);
+      if (user) {
+        loadAvatarFromSupabase().then(av => {
+          if (av) { setAvatarSymbolId(av.symbol); setAvatarLabel(av.label); }
+        });
+      }
     });
     return () => subscription.unsubscribe();
   }, []);
@@ -135,6 +140,7 @@ export default function LandingPage() {
           onClose={() => setShowProfile(false)}
           onRefineAesthetic={() => setShowProfile(false)}
           onNotesChange={() => {}}
+          onAvatarChange={(symbol, label) => { setAvatarSymbolId(symbol); setAvatarLabel(label); }}
         />
       )}
 
@@ -169,7 +175,7 @@ export default function LandingPage() {
               color: label === "ORDRE" ? "rgba(26,18,10,0.85)" : "rgba(26,18,10,0.5)",
               textDecoration: "none",
               borderBottom: label === "ORDRE" ? "1px solid rgba(26,18,10,0.4)" : "none",
-              paddingBottom: label === "ORDRE" ? "2px" : "0",
+              padding: label === "ORDRE" ? "0.55rem 0.3rem 0.35rem" : "0.55rem 0.3rem",
             }}>
               {label}
             </Link>
@@ -177,10 +183,10 @@ export default function LandingPage() {
         </nav>
         {userName ? (() => {
           const sym = SYMBOLS.find(s => s.id === avatarSymbolId);
-          const labelText = avatarLabel === "name"
+          const labelText = avatarLabel && avatarLabel !== "name" && avatarLabel !== "none"
+            ? avatarLabel
+            : avatarLabel === "name"
             ? userName.split(" ")[0]
-            : avatarLabel === "initial"
-            ? userName.charAt(0).toUpperCase()
             : null;
           return (
             <button
@@ -188,7 +194,7 @@ export default function LandingPage() {
               style={{
                 background: "none",
                 border: "none",
-                padding: 0,
+                padding: "0.35rem",
                 cursor: "pointer",
                 display: "flex",
                 flexDirection: "column",
@@ -202,7 +208,18 @@ export default function LandingPage() {
               aria-label="Open profile"
             >
               {sym ? (
-                <SymbolSvg symbol={sym} size={20} color="rgba(26,18,10,0.8)" />
+                <div style={{
+                  width: 34,
+                  height: 34,
+                  borderRadius: "50%",
+                  background: "#fff",
+                  boxShadow: "0 0 0 1px rgba(26,18,10,0.75)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}>
+                  <SymbolSvg symbol={sym} size={22} color="rgba(26,18,10,0.8)" />
+                </div>
               ) : (
                 <span style={{
                   fontFamily: "var(--font-jost)",
@@ -216,12 +233,14 @@ export default function LandingPage() {
               )}
               {labelText && (
                 <span style={{
-                  fontFamily: "var(--font-jost)",
-                  fontSize: "0.38rem",
-                  letterSpacing: "0.18em",
-                  textTransform: "uppercase",
-                  color: "rgba(26,18,10,0.55)",
+                  fontFamily: "var(--font-cormorant)",
+                  fontSize: "0.65rem",
+                  letterSpacing: "0.06em",
+                  paddingLeft: "0.3em",
+                  color: "rgba(26,18,10,0.95)",
                   lineHeight: 1,
+                  textAlign: "center" as const,
+                  display: "block",
                 }}>
                   {labelText}
                 </span>
@@ -237,6 +256,7 @@ export default function LandingPage() {
             color: "rgba(26,18,10,0.5)",
             textDecoration: "none",
             outline: "none",
+            padding: "0.55rem 0.3rem",
           }}>
             SIGN IN
           </Link>
@@ -315,7 +335,7 @@ export default function LandingPage() {
             </div>
           </Link>
           <a href="/sign-in" style={{
-            marginTop: "1.25rem",
+            marginTop: "0.65rem",
             fontFamily: "var(--font-jost)",
             fontSize: "0.5rem",
             letterSpacing: "0.22em",
@@ -323,7 +343,7 @@ export default function LandingPage() {
             color: "rgba(90,60,25,0.65)",
             textDecoration: "none",
             borderBottom: "1px solid rgba(90,60,25,0.35)",
-            paddingBottom: "1px",
+            padding: "0.6rem 0.3rem 0.35rem",
           }}>
             Already a client? Sign in
           </a>

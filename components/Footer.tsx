@@ -12,6 +12,7 @@ const LINK: React.CSSProperties = {
   color: "rgba(55,38,12,0.72)",
   textDecoration: "none",
   cursor: "pointer",
+  padding: "0.6rem 0.3rem",
 };
 
 export default function Footer() {
@@ -34,7 +35,7 @@ export default function Footer() {
           <a href="/terms"    style={LINK}>Terms of Service</a>
           <button
             onClick={() => window.dispatchEvent(new Event("ordre:cookie-preferences"))}
-            style={{ ...LINK, background: "none", border: "none", padding: 0 }}
+            style={{ ...LINK, background: "none", border: "none" }}
           >
             Cookie Preferences
           </button>

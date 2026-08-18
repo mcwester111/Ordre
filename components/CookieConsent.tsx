@@ -184,7 +184,7 @@ export default function CookieConsent() {
               style={{
                 background: "none",
                 border: "none",
-                padding: 0,
+                padding: "0.55rem 0.3rem 0.35rem",
                 cursor: "pointer",
                 fontFamily: "var(--font-jost)",
                 fontSize: "0.58rem",
@@ -193,7 +193,6 @@ export default function CookieConsent() {
                 textTransform: "uppercase",
                 color: MUTED,
                 borderBottom: `1px solid ${GOLD_DIM}`,
-                paddingBottom: 2,
               }}
             >
               {expanded ? "Hide details" : "Details"}

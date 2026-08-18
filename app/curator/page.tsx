@@ -1063,47 +1063,17 @@ export default function CuratorPage() {
             onChange={handleFilesSelected}
           />
 
-          {/* Composer — a writing card: warm parchment with a fine ink border,
-              rather than a glassy tech bubble. */}
+          {/* Composer — thin inline bar: + | textarea | send */}
           <div
-            className="flex flex-col"
+            className="flex items-center gap-2"
             style={{
-              borderRadius: "13px",
-              padding: "16px 17px 11px",
+              borderRadius: "999px",
+              padding: "7px 8px 7px 6px",
               background: "rgba(244,237,224,0.95)",
               border: "1px solid rgba(26,18,10,0.22)",
-              boxShadow: "0 6px 20px -14px rgba(40,28,12,0.28), inset 0 0 0 3px rgba(244,237,224,1), inset 0 0 0 4px rgba(120,85,40,0.13)",
+              boxShadow: "0 6px 20px -14px rgba(40,28,12,0.28)",
             }}
           >
-            {/* Text input — full width, top */}
-            <textarea
-              id="composer"
-              ref={textareaRef}
-              value={input}
-              onChange={handleTextareaInput}
-              onKeyDown={handleKeyDown}
-              placeholder={messages.length === 0 ? "Describe your vision, or share an image…" : ""}
-              disabled={isLoading}
-              rows={1}
-              className="w-full bg-transparent text-[15px] disabled:opacity-40"
-              style={{
-                minHeight: "28px",
-                maxHeight: "200px",
-                lineHeight: "1.6",
-                caretColor: "#1A120A",
-                color: "#1A120A",
-                fontFamily: "var(--font-inter)",
-                resize: "none",
-                outline: "none",
-                padding: "2px 4px 0",
-              }}
-            />
-
-            {/* Thin writing line — a soft sepia baseline the text rests on */}
-            <div style={{ height: "1px", background: "rgba(120,85,40,0.22)", margin: "9px 2px 0" }} />
-
-            {/* Controls row */}
-            <div className="flex items-center justify-between" style={{ marginTop: "10px" }}>
               {/* Attach menu (+) */}
               <div className="relative" ref={plusRef}>
                 {plusOpen && (
@@ -1171,19 +1141,42 @@ export default function CuratorPage() {
                   onClick={() => setPlusOpen((o) => !o)}
                   disabled={isLoading}
                   className="flex-shrink-0 flex items-center justify-center rounded-full transition-all duration-200 disabled:opacity-30"
-                  style={{ width: 34, height: 34, border: "1px solid rgba(26,18,10,0.16)", background: plusOpen ? "rgba(26,18,10,0.06)" : "transparent" }}
+                  style={{ width: 30, height: 30, border: "1px solid rgba(26,18,10,0.16)", background: plusOpen ? "rgba(26,18,10,0.06)" : "transparent" }}
                   title="Add"
                 >
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(26,18,10,0.6)" strokeWidth="1.6" strokeLinecap="round" style={{ transform: plusOpen ? "rotate(45deg)" : "none", transition: "transform 0.2s ease" }}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="rgba(26,18,10,0.6)" strokeWidth="1.6" strokeLinecap="round" style={{ transform: plusOpen ? "rotate(45deg)" : "none", transition: "transform 0.2s ease" }}>
                     <line x1="12" y1="5" x2="12" y2="19" />
                     <line x1="5" y1="12" x2="19" y2="12" />
                   </svg>
                 </button>
               </div>
 
-              {/* Send (circular up-arrow) — hidden until there's something to send.
-                  When it appears, the circle + arrow take the app's muted-black
-                  ink, signalling the curator is active and ready. */}
+            {/* Text input — grows with content */}
+            <textarea
+              id="composer"
+              ref={textareaRef}
+              value={input}
+              onChange={handleTextareaInput}
+              onKeyDown={handleKeyDown}
+              placeholder={messages.length === 0 ? "Describe your vision, or share an image…" : ""}
+              disabled={isLoading}
+              rows={1}
+              className="flex-1 bg-transparent text-[15px] disabled:opacity-40"
+              style={{
+                minHeight: "24px",
+                maxHeight: "200px",
+                lineHeight: "1.6",
+                caretColor: "#1A120A",
+                color: "#1A120A",
+                fontFamily: "var(--font-inter)",
+                resize: "none",
+                outline: "none",
+                padding: "0 4px",
+                alignSelf: "center",
+              }}
+            />
+
+              {/* Send button — appears when there's content */}
               {(!!input.trim() || pendingImages.length > 0 || pendingDocs.length > 0 || isLoading) && (
                 <button
                   onClick={handleSubmit}
@@ -1191,8 +1184,8 @@ export default function CuratorPage() {
                   title="Send"
                   className="flex-shrink-0 flex items-center justify-center rounded-full transition-colors duration-200"
                   style={{
-                    width: 34,
-                    height: 34,
+                    width: 30,
+                    height: 30,
                     background: "rgba(26,18,10,0.14)",
                     border: "1px solid rgba(26,18,10,0.85)",
                     animation: "fadeInOverlay 0.2s ease both",
@@ -1206,23 +1199,13 @@ export default function CuratorPage() {
                       style={{ border: "1px solid rgba(26,18,10,0.25)", borderTopColor: "rgba(26,18,10,0.85)", animation: "spin 0.8s linear infinite" }}
                     />
                   ) : (
-                    <svg
-                      width="15"
-                      height="15"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="rgba(26,18,10,0.85)"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="rgba(26,18,10,0.85)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                       <line x1="12" y1="19" x2="12" y2="5" />
                       <polyline points="5 12 12 5 19 12" />
                     </svg>
                   )}
                 </button>
               )}
-            </div>
           </div>
         </div>
 

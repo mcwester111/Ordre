@@ -208,7 +208,7 @@ const TERMS: LegalContent = {
       title: `Governing Law & Dispute Resolution`,
       blocks: [
         {
-          p: `These Terms are governed by the laws of the **State of [State/Country]**, without regard to its conflict-of-laws rules, except where mandatory consumer-protection laws of your place of residence apply.`,
+          p: `These Terms are governed by the laws of the **State of California**, without regard to its conflict-of-laws rules, except where mandatory consumer-protection laws of your place of residence apply.`,
         },
         {
           sub: `Informal resolution`,
